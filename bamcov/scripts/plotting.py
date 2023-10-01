@@ -20,6 +20,7 @@ def create_coverage_plot(fig, row, coverage_df):
     h_template = ""
     for index, description in enumerate(["coverage", "percentage A", "percentage C", "percentage G", "percentage T"]):
         h_template = h_template + f"<b>{description}: </b>%" + "{customdata" + f"[{index+1}" + "]}<br>"
+    h_template = h_template + "<extra></extra>"  # remove trace name
     # add dots with info
     fig.add_trace(
         go.Scatter(
@@ -115,6 +116,7 @@ def create_vcf_plot(fig, row, vcf_df):
         if index == 0:
             continue
         h_template = h_template + f"<b>{description}: </b>%" + "{customdata" + f"[{index}" + "]}<br>"
+    h_template = h_template + "<extra></extra>"  # remove trace name
 
     for mut, color in zip(["SNP", "INS", "DEL"], ["grey", "blue", "red"]):
         if mut not in list(vcf_df["type"]):
