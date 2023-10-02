@@ -3,6 +3,7 @@ contains defs for data analysis
 """
 # BUILT INS
 import sys
+import statistics
 
 # LIBS
 import pandas as pd
@@ -86,7 +87,7 @@ def vcf_to_df(vcf, ref):
     return pd.DataFrame.from_dict(variant_dict)
 
 
-def genebank_to_dict(infile, bam, ref):
+def genebank_to_dict(infile, ref, coverage_df):
     """
     parses genebank to dic and computes coverage for each annotation
     :param infile: genebank record
@@ -106,7 +107,11 @@ def genebank_to_dict(infile, bam, ref):
                 feature_dict[feature.type] = {}
             start, stop = feature.location.start + 1, feature.location.end
             feature_dict[feature.type][f"{start} {stop}"] = {}
-            feature_dict[feature.type][f"{start} {stop}"]["mean coverage"] = bam.count(contig=ref, start=start, end=stop)
+            feature_dict[feature.type][f"{start} {stop}"]["mean coverage"] = round(
+                statistics.mean(
+                    coverage_df[(coverage_df["position"] >= start) & (coverage_df["position"] <= stop)]["coverage"]
+                )
+            )
             for qualifier in feature.qualifiers:
                 feature_dict[feature.type][f"{start} {stop}"][qualifier] = feature.qualifiers[qualifier][0]
     # add the track (y position) to plot the feature in
