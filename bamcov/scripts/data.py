@@ -1,9 +1,12 @@
 """
 contains defs for data analysis
 """
+# BUILT INS
+import sys
 
 # LIBS
 import pandas as pd
+from Bio import SeqIO
 
 
 def bam_to_coverage_df(bam, ref):
@@ -82,3 +85,30 @@ def vcf_to_df(vcf, ref):
 
     return pd.DataFrame.from_dict(variant_dict)
 
+
+def genebank_to_dict(infile, bam, ref):
+    """
+    parses genebank to dic and computes coverage for each annotation
+    :param infile: genebank record
+    :param ref: reference id
+    :param bam: parsed bam
+    :return: feature_dict: dictionary with all features
+    """
+
+    feature_dict = {}
+
+    for gb_record in SeqIO.parse(open(infile, "r"), "genbank"):
+        # check if the record matches the provided ref
+        if not any([gb_record.id != ref, gb_record.name != ref]):
+            sys.exit("ERROR: provided gb file does not seem to match record the reads were mapped to.")
+        for feature in gb_record.features:
+            if feature.type not in feature_dict:
+                feature_dict[feature.type] = {}
+            start, stop = feature.location.start + 1, feature.location.end
+            feature_dict[feature.type][f"{start} {stop}"] = {}
+            feature_dict[feature.type][f"{start} {stop}"]["coverage"] = round(
+                bam.count(contig=ref, start=start, end=stop) / (stop - start))
+            for qualifier in feature.qualifiers:
+                feature_dict[feature.type][f"{start} {stop}"][qualifier] = feature.qualifiers[qualifier][0]
+
+    return feature_dict

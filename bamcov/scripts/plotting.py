@@ -2,7 +2,6 @@
 contains defs for plotting
 """
 
-
 # BUILT-INS
 import statistics
 # LIBS
@@ -29,9 +28,8 @@ def create_coverage_plot(fig, row, coverage_df):
             customdata=coverage_df,
             fill="tonexty",
             fillcolor="rgba(255, 212, 135, 0.2)",
-            line_color="rgba(224, 168, 68, 1)",
+            line=dict(color="rgba(224, 168, 68, 1)"),
             hovertemplate=h_template,
-            legendgroup="cov",
             name="coverage",
             showlegend=True
         ),
@@ -42,25 +40,13 @@ def create_coverage_plot(fig, row, coverage_df):
     average_cov = statistics.mean(coverage_df["coverage"])
     fig.add_trace(
         go.Scatter(
-            x=[max(coverage_df["position"])*0.01],
-            y=[average_cov+average_cov*0.05],
-            text=[f"{round(average_cov)}x"],
-            mode="text",
-            textposition="top right",
-            showlegend=False,
-            legendgroup="mean"
-        ),
-        row=row,
-        col=1
-    )
-    fig.add_trace(
-        go.Scatter(
             x=[min(coverage_df["position"]), max(coverage_df["position"])],
             y=[average_cov, average_cov],
-            mode="lines",
+            text=[f"{round(average_cov)}x", ""],
+            textposition="top right",
+            mode="lines+text",
             line=dict(color="grey", width=1, dash="dash"),
             showlegend=True,
-            legendgroup="mean",
             name="average"
         ),
         row=row,
