@@ -106,8 +106,7 @@ def genebank_to_dict(infile, bam, ref):
                 feature_dict[feature.type] = {}
             start, stop = feature.location.start + 1, feature.location.end
             feature_dict[feature.type][f"{start} {stop}"] = {}
-            feature_dict[feature.type][f"{start} {stop}"]["coverage"] = round(
-                bam.count(contig=ref, start=start, end=stop) / (stop - start))
+            feature_dict[feature.type][f"{start} {stop}"]["mean coverage"] = bam.count(contig=ref, start=start, end=stop)
             for qualifier in feature.qualifiers:
                 feature_dict[feature.type][f"{start} {stop}"][qualifier] = feature.qualifiers[qualifier][0]
     # add the track (y position) to plot the feature in

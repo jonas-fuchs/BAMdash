@@ -6,6 +6,7 @@ contains defs for plotting
 import statistics
 # LIBS
 import plotly.graph_objects as go
+import plotly.express as px
 
 def create_coverage_plot(fig, row, coverage_df):
     """
@@ -41,7 +42,7 @@ def create_coverage_plot(fig, row, coverage_df):
     fig.add_trace(
         go.Scatter(
             x=[min(coverage_df["position"]), max(coverage_df["position"])],
-            y=[average_cov, average_cov],
+            y=[average_cov]*2,
             text=[f"{round(average_cov)}x", ""],
             textposition="top right",
             mode="lines+text",
@@ -146,4 +147,109 @@ def create_vcf_plot(fig, row, vcf_df):
         fig.update_yaxes(visible=False, row=row, col=1)
     else:
         fig.update_yaxes(title_text="frequency", range=[0, 1], row=row, col=1)
+
+
+def create_gb_plot(fig, row, feature_dict):
+    """
+    :param fig: plotly fig
+    :param row: where to plot
+    :param feature_dict: all infos from gb file
+    :return: updated figure
+    """
+    # define colors
+    n_colors = len(feature_dict)
+    colors = px.colors.sample_colorscale("agsunset", [n / (n_colors - 1) for n in range(n_colors)])
+
+    for feature, color in zip(feature_dict, colors):
+        # define colors with 2 different alpha values, box size and cycle counter
+        color_thes, b_size, cycle = ["rgba(" + color[4:-1] + ", 0.6)", "rgba(" + color[4:-1] + ", 0.8)"], [0.4,
+                                                                                                           0.3], 0
+        # iterate over the different seq features
+        for annotation, legend_vis in zip(feature_dict[feature], [True] + [False] * (len(feature_dict) - 1)):
+            # define current cycle
+            if cycle == 2:
+                cycle = 0
+            # get various plot info
+            positions = [int(x) for x in annotation.split(" ")]
+            track = feature_dict[feature][annotation]["track"]
+            single_pos = list(range(positions[0], positions[1] + 1))
+            # define a hover template
+            h_template = f"<b>type: </b> {feature}<br>"
+            for index, classifier in enumerate(feature_dict[feature][annotation]):
+                if classifier == "track" or classifier == "translation":
+                    continue
+                h_template = h_template + f"<b>{classifier}: </b>%" + "{customdata" + f"[{index}" + "]}<br>"
+            h_template = h_template + "<extra></extra>"
+            # and create the custom data
+            custom_data = [list(feature_dict[feature][annotation].values())[:-1]] * len(single_pos)
+            # add upper line
+            fig.add_trace(
+                go.Scatter(
+                    x=positions,
+                    y=[track + b_size[cycle], track + b_size[cycle]],
+                    mode="lines",
+                    line=dict(color="grey"),
+                    showlegend=False,
+                    legendgroup=feature,
+                    hoverinfo="skip"
+                ),
+                row=row,
+                col=1
+            )
+            # fill the square
+            fig.add_trace(
+                go.Scatter(
+                    x=positions,
+                    y=[track - b_size[cycle], track - b_size[cycle]],
+                    mode="none",
+                    line=dict(color="grey"),
+                    fill="tonexty",
+                    fillcolor=color_thes[cycle],
+                    showlegend=legend_vis,
+                    name="",
+                    legendgroup=feature,
+                    legendgrouptitle_text=feature,
+                    hoverinfo="skip"
+                ),
+                row=row,
+                col=1
+            )
+            # plot remaining lines to form a square
+            for x, y in zip(
+                    [positions, [positions[0]] * 2, [positions[1]] * 2],
+                    [[track - b_size[cycle], track - b_size[cycle]], [track + b_size[cycle], track - b_size[cycle]],
+                     [track + b_size[cycle], track - b_size[cycle]]]
+            ):
+                fig.add_trace(
+                    go.Scatter(
+                        x=x,
+                        y=y,
+                        mode="lines",
+                        line=dict(color="grey"),
+                        showlegend=False,
+                        legendgroup=feature,
+                        hoverinfo="skip"
+                    ),
+                    row=row,
+                    col=1
+                )
+            # hover info
+            fig.add_trace(
+                go.Scatter(
+                    x=single_pos,
+                    y=[track] * len(single_pos),
+                    mode=None,
+                    line=dict(color=color),
+                    opacity=0,
+                    showlegend=False,
+                    legendgroup=feature,
+                    hovertemplate=h_template,
+                    customdata=custom_data
+                ),
+                row=row,
+                col=1
+            )
+            fig.update_yaxes(visible=False, row=row, col=1)
+            # switch to next cycle
+            cycle += 1
 
