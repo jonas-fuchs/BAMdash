@@ -110,5 +110,27 @@ def genebank_to_dict(infile, bam, ref):
                 bam.count(contig=ref, start=start, end=stop) / (stop - start))
             for qualifier in feature.qualifiers:
                 feature_dict[feature.type][f"{start} {stop}"][qualifier] = feature.qualifiers[qualifier][0]
+    # add the track (y position) to plot the feature in
+    # remember for each track the largest stop
+    track_stops = [0]
+    for feature_type in feature_dict:
+        track = 0
+        # check if a start of a gene is smaller than the stop of the current track
+        # -> move to new track
+        for annotation in feature_dict[feature_type]:
+            positions = [int(x) for x in annotation.split(" ")]
+            while positions[0] < track_stops[track]:
+                track += 1
+                # if all prior tracks are potentially causing an overlap
+                # create a new track and break
+                if len(track_stops) <= track:
+                    track_stops.append(0)
+                    break
+            # in the current track remember the stop of the current annotation
+            track_stops[track] = positions[1]
+            # and indicate the track in the dict
+            feature_dict[feature_type][annotation]["track"] = track
+        # for each annotation make sure to always add another track
+        track += 1
 
     return feature_dict
