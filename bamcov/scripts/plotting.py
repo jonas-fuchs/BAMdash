@@ -7,6 +7,9 @@ import statistics
 # LIBS
 import plotly.graph_objects as go
 import plotly.express as px
+# BAMcov
+from bamcov.scripts import config
+
 
 def create_coverage_plot(fig, row, coverage_df):
     """
@@ -28,8 +31,8 @@ def create_coverage_plot(fig, row, coverage_df):
             y=coverage_df["coverage"],
             customdata=coverage_df,
             fill="tonexty",
-            fillcolor="rgba(255, 212, 135, 0.2)",
-            line=dict(color="rgba(224, 168, 68, 1)"),
+            fillcolor=config.coverage_fill_color,
+            line=dict(color=config.coverage_line_color),
             hovertemplate=h_template,
             name="coverage",
             showlegend=True
@@ -43,10 +46,10 @@ def create_coverage_plot(fig, row, coverage_df):
         go.Scatter(
             x=[min(coverage_df["position"]), max(coverage_df["position"])],
             y=[average_cov]*2,
-            text=[f"{round(average_cov)}x", ""],
-            textposition="top right",
+            text=["", f"{round(average_cov)}x"],
+            textposition="top left",
             mode="lines+text",
-            line=dict(color="grey", width=1, dash="dash"),
+            line=dict(color=config.average_line_color, width=1, dash="dash"),
             showlegend=True,
             name="average"
         ),
@@ -105,7 +108,7 @@ def create_vcf_plot(fig, row, vcf_df):
         h_template = h_template + f"<b>{description}: </b>%" + "{customdata" + f"[{index}" + "]}<br>"
     h_template = h_template + "<extra></extra>"  # remove trace name
 
-    for mut, color in zip(["SNP", "INS", "DEL"], ["grey", "blue", "red"]):
+    for mut, color in zip(["SNP", "INS", "DEL"], [config.snp_color, config.ins_color, config.del_color]):
         if mut not in list(vcf_df["type"]):
             continue
         # add trace
@@ -137,7 +140,7 @@ def create_vcf_plot(fig, row, vcf_df):
             x1=x,
             y1=y-0.05,
             line=dict(
-                color="grey",
+                color=config.stem_color,
                 width=1
             )
         ) for x, y in zip(vcf_df["position"], y_data)]
@@ -149,22 +152,19 @@ def create_vcf_plot(fig, row, vcf_df):
         fig.update_yaxes(title_text="frequency", range=[0, 1], row=row, col=1)
 
 
-def create_gb_plot(fig, row, feature_dict):
+def create_track_plot(fig, row, feature_dict):
     """
     :param fig: plotly fig
     :param row: where to plot
-    :param feature_dict: all infos from gb file
-    :param bam: parsed bam
-    :param ref: parsed ref id
+    :param feature_dict: all infos for tracks as dictionary
     :return: updated figure
     """
     # define colors
     n_colors = len(feature_dict)
-    colors = px.colors.sample_colorscale("agsunset", [n / (n_colors - 1) for n in range(n_colors)])
-    hoverpositions = []
+    colors = px.colors.sample_colorscale(config.color_scheme, [n / (n_colors - 1) for n in range(n_colors)])
     for feature, color in zip(feature_dict, colors):
         # define colors with 2 different alpha values, box size and cycle counter
-        color_thes, b_size, cycle = ["rgba(" + color[4:-1] + ", 0.6)", "rgba(" + color[4:-1] + ", 0.8)"], [0.4, 0.3], 0
+        color_thes, b_size, cycle = ["rgba(" + color[4:-1] + f", {config.box_alpha[0]})", "rgba(" + color[4:-1] + f", {config.box_alpha[1]})"], config.box_size, 0
         # iterate over the different seq features
         for annotation, legend_vis in zip(feature_dict[feature], [True] + [False] * (len(feature_dict) - 1)):
             # define current cycle
@@ -173,7 +173,13 @@ def create_gb_plot(fig, row, feature_dict):
             # get various plot info
             positions = [int(x) for x in annotation.split(" ")]
             track = feature_dict[feature][annotation]["track"]
-
+            # define strand marker
+            if feature_dict[feature][annotation]["strand"] == "+":
+                marker_type = config.strand_types[0]
+            elif feature_dict[feature][annotation]["strand"] == "-":
+                marker_type = config.strand_types[1]
+            else:
+                marker_type = config.strand_types[2]
             # define a hover text
             h_text = f"<b>type: </b> {feature}<br>"
             for classifier in feature_dict[feature][annotation]:
@@ -182,8 +188,6 @@ def create_gb_plot(fig, row, feature_dict):
                 h_text = h_text + f"<b>{classifier}: </b>{feature_dict[feature][annotation][classifier]} <br>"
             # define place for hover info
             x = positions[0] + (positions[1] - positions[0]) / 2
-            if x in hoverpositions:
-                x+=1
             # add hover info
             fig.add_trace(
                 go.Scatter(
@@ -191,7 +195,15 @@ def create_gb_plot(fig, row, feature_dict):
                     y=[track],
                     legendgroup=feature,
                     mode="markers",
-                    opacity=0,
+                    marker=dict(
+                        size=8,
+                        symbol=marker_type,
+                        color=color,
+                        line=dict(
+                            width=1,
+                            color="rgba(0, 0, 0, 0.2)"
+                        )
+                    ),
                     name="",
                     showlegend=False,
                     hoverinfo="text",
@@ -200,6 +212,7 @@ def create_gb_plot(fig, row, feature_dict):
                 row=row,
                 col=1
             )
+            # add the track rectangle
             fig.add_trace(
                 go.Scatter(
                     x=[positions[0], positions[1], positions[1], positions[0], positions[0]],
