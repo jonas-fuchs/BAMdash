@@ -16,7 +16,7 @@ average_line_width = 1
 
 # track customize
 track_color_scheme = "agsunset"  # for mutiple annotations tracks (genebank)
-track_color_single = "rgb(145, 145, 145)"  # for single tracks (any rgb value)
+track_color_single = "rgb(145, 145, 145)"  # for single tracks (any rgb value, but no name colors)
 strand_types = ["triangle-right", "triangle-left", "diamond-wide"]  # +, -, undefined strand
 strand_marker_size = 8
 strand_marker_line_width = 1
