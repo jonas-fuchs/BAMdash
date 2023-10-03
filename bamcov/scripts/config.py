@@ -1,5 +1,5 @@
 """
-contains config setting for BAMcov
+contains config setting for BAMcov to customize the plot
 """
 
 # overall layout
@@ -9,9 +9,9 @@ bed_track_proportion = 0.2
 plot_spacing = 0.05
 
 # coverage customize
-coverage_fill_color = "rgba(255, 212, 135, 0.2)"  # coverage plot
-coverage_line_color = "rgba(224, 168, 68, 1)"  # coverage plot
-average_line_color = "grey"  # coverage plot
+coverage_fill_color = "rgba(255, 212, 135, 0.2)"
+coverage_line_color = "rgba(224, 168, 68, 1)"
+average_line_color = "grey"
 average_line_width = 1
 
 # track customize

@@ -1,8 +1,18 @@
+"""
+contains main workflow
+"""
+
 # BUILT-INS
 import sys
 import argparse
 
-# bamcov
+# LIBS
+from plotly.subplots import make_subplots
+
+# BAMCOV
+from bamcov.scripts import data
+from bamcov.scripts import plotting
+from bamcov.scripts import config
 from bamcov import __version__
 from . import _program
 
@@ -81,5 +91,94 @@ def main(sysargs=sys.argv[1:]):
     """
     # parse args
     args = get_args(sysargs)
-    print("todo")
+    # define subplot number and track heights
+    track_heights = [1]
+    if args.tracks is not None:
+        number_of_tracks = len(args.tracks)+1
+        for track in args.tracks:
+            if track.endswith("vcf"):
+                track_heights = track_heights + config.vcf_track_proportion
+            elif track.endswith("gb"):
+                track_heights = track_heights + config.gb_track_proportion
+            elif track.endswith("bed"):
+                track_heights = track_heights + config.bed_track_proportion
+            else:
+                sys.exit("one of the track types is not supported")
+    else:
+        number_of_tracks = 1
 
+    # define layout
+    fig = make_subplots(
+        rows=number_of_tracks,
+        cols=1,
+        shared_xaxes=True,
+        row_heights=track_heights,
+        vertical_spacing=config.plot_spacing,
+    )
+    # create coverage plot
+    coverage_df, title = data.bam_to_coverage_df(args.bam, args.reference)
+    plotting.create_coverage_plot(fig, 1, coverage_df)
+    # create track plots
+    if args.tracks is not None:
+        for row, track in enumerate(args.tracks):
+            if track.endswith("vcf"):
+                vcf_df = data.vcf_to_df(track, args.reference)
+                plotting.create_vcf_plot(fig, row+1, vcf_df)
+            elif track.endswith("gb"):
+                gb_dict = data.genbank_to_dict(track, coverage_df, args.reference)
+                plotting.create_track_plot(fig, row+1, gb_dict, config.box_gb_size, config.box_gb_alpha)
+            elif track.endswith("bed"):
+                bed_dict = data.bed_to_dict(track, coverage_df, args.reference)
+                plotting.create_track_plot(fig, 4, bed_dict, config.box_bed_size, config.box_bed_alpha)
+
+    # global formatting
+    fig.update_layout(
+        plot_bgcolor="white",
+        hovermode="x unified",
+        title=dict(
+            text=title,
+            x=1,
+            font=dict(
+                family="Arial",
+                size=16,
+                color='#000000'
+            )
+        ),
+        font=dict(
+            family="Arial",
+            size=16,
+        )
+    )
+    # global x axes
+    fig.update_xaxes(
+        mirror=False,
+        ticks="outside",
+        showline=True,
+        linecolor="black",
+        range=[0, max(coverage_df["position"])]
+    )
+    # global y axis
+    fig.update_yaxes(
+        mirror=False,
+        ticks="outside",
+        showline=True,
+        linecolor="black"
+    )
+    # if a range slider is shown, do not display the xaxis title
+    # (will be shown underneath)
+    if args.slider:
+        # last y axis
+        fig.update_xaxes(
+            rangeslider=dict(
+                visible=True,
+                thickness=0.05
+            ),
+            row=number_of_tracks
+        )
+    else:
+        # last x axis
+        fig.update_xaxes(title_text="genome position", row=number_of_tracks, col=1)
+
+    fig.write_html(f"{args.reference}_plot.html")
+    if args.export_static is not None:
+        fig.write_image(f"{args.reference}_plot.{args.export_static}", width=args.dimensions[0], height=args.dimensions[1])
