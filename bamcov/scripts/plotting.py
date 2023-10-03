@@ -49,7 +49,7 @@ def create_coverage_plot(fig, row, coverage_df):
             text=["", f"{round(average_cov)}x"],
             textposition="top left",
             mode="lines+text",
-            line=dict(color=config.average_line_color, width=1, dash="dash"),
+            line=dict(color=config.average_line_color, width=config.average_line_width, dash="dash"),
             showlegend=True,
             name="average"
         ),
@@ -123,7 +123,11 @@ def create_vcf_plot(fig, row, vcf_df):
                 hovertemplate=h_template,
                 marker=dict(
                     color=color,
-                    size=14,
+                    size=config.variant_marker_size,
+                    line=dict(
+                        color=config.variant_line_color,
+                        width=config.variant_marker_line_width
+                    )
                 )
             ),
         row=row,
@@ -141,32 +145,38 @@ def create_vcf_plot(fig, row, vcf_df):
             y1=y-0.05,
             line=dict(
                 color=config.stem_color,
-                width=1
+                width=config.stem_width
             )
         ) for x, y in zip(vcf_df["position"], y_data)]
     )
-    # not need to show y axis if af is not in vcf
+    # not need to show yaxis if af is not in vcf
     if "AF" not in vcf_df:
         fig.update_yaxes(visible=False, row=row, col=1)
     else:
         fig.update_yaxes(title_text="frequency", range=[0, 1], row=row, col=1)
 
 
-def create_track_plot(fig, row, feature_dict):
+def create_track_plot(fig, row, feature_dict, box_size, box_alpha):
     """
     :param fig: plotly fig
     :param row: where to plot
     :param feature_dict: all infos for tracks as dictionary
+    :param box_size: list of box sizes
+    :param box_alpha: list of box alpha values
     :return: updated figure
     """
     # define colors
     n_colors = len(feature_dict)
-    colors = px.colors.sample_colorscale(config.color_scheme, [n / (n_colors - 1) for n in range(n_colors)])
+    if n_colors > 1:
+        colors = px.colors.sample_colorscale(config.track_color_scheme, [n / (n_colors - 1) for n in range(n_colors)])
+    else:
+        colors = [config.track_color_single]
+
     for feature, color in zip(feature_dict, colors):
         # define colors with 2 different alpha values, box size and cycle counter
-        color_thes, b_size, cycle = ["rgba(" + color[4:-1] + f", {config.box_alpha[0]})", "rgba(" + color[4:-1] + f", {config.box_alpha[1]})"], config.box_size, 0
+        color_thes, b_size, cycle = ["rgba(" + color[4:-1] + f", {box_alpha[0]})", "rgba(" + color[4:-1] + f", {box_alpha[1]})"], box_size, 0
         # iterate over the different seq features
-        for annotation, legend_vis in zip(feature_dict[feature], [True] + [False] * (len(feature_dict) - 1)):
+        for annotation, legend_vis in zip(feature_dict[feature], [True] + [False] * (len(feature_dict[feature]) - 1)):
             # define current cycle
             if cycle == 2:
                 cycle = 0
@@ -196,12 +206,12 @@ def create_track_plot(fig, row, feature_dict):
                     legendgroup=feature,
                     mode="markers",
                     marker=dict(
-                        size=8,
+                        size=config.strand_marker_size,
                         symbol=marker_type,
                         color=color,
                         line=dict(
-                            width=1,
-                            color="rgba(0, 0, 0, 0.2)"
+                            width=config.strand_marker_line_width,
+                            color=config.strand_marker_line_color
                         )
                     ),
                     name="",
