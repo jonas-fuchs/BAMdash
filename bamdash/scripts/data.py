@@ -135,8 +135,6 @@ def define_track_position(feature_dict):
         for annotation in feature_dict[feature_type]:
             track = 0
             positions = [int(x) for x in annotation.split(" ")]
-            if feature_dict[feature_type][annotation]["strand"] == "-":
-                positions = list(reversed(positions))
             while positions[0] < track_stops[track]:
                 track += 1
                 # if all prior tracks are potentially causing an overlap

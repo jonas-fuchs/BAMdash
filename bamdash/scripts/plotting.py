@@ -93,32 +93,32 @@ def create_vcf_plot(fig, row, vcf_df):
     :param vcf_df: df with vcf info
     :return: updated figure
     """
-    # check if allelic frequency is present,
-    # otherwise set to one
-    if "AF" in vcf_df:
-        y_data = vcf_df["AF"]
-    else:
-        y_data = [1] * len(vcf_df["position"])
-    # create hover template
-    h_template = ""
-    for index, description in enumerate(list(vcf_df.columns)):
-        # do not show position
-        if index == 0:
-            continue
-        h_template = h_template + f"<b>{description}: </b>%" + "{customdata" + f"[{index}" + "]}<br>"
-    h_template = h_template + "<extra></extra>"  # remove trace name
 
     for mut, color in zip(["SNP", "INS", "DEL"], [config.snp_color, config.ins_color, config.del_color]):
         if mut not in list(vcf_df["type"]):
             continue
+        vcf_subset = vcf_df[vcf_df["type"] == mut]
+        # check if allelic frequency is present otherwise set to one
+        if "AF" in vcf_subset:
+            y_data = vcf_subset["AF"]
+        else:
+            y_data = [1] * len(vcf_subset["position"])
+        # create hover template
+        h_template = ""
+        for index, description in enumerate(list(vcf_subset.columns)):
+            # do not show position
+            if index == 0:
+                continue
+            h_template = h_template + f"<b>{description}: </b>%" + "{customdata" + f"[{index}" + "]}<br>"
+        h_template = h_template + "<extra></extra>"  # remove trace name
         # add trace
         fig.add_trace(
             go.Scatter(
-                x=vcf_df["position"],
+                x=vcf_subset["position"],
                 y=y_data,
                 name=mut,
                 mode="markers",
-                customdata=vcf_df,
+                customdata=vcf_subset,
                 showlegend=True,
                 hovertemplate=h_template,
                 marker=dict(
@@ -133,22 +133,22 @@ def create_vcf_plot(fig, row, vcf_df):
         row=row,
         col=1
         )
-    # add lines
-    fig.update_layout(
-        shapes=[dict(
-            type="line",
-            xref=f"x{row}",
-            yref=f"y{row}",
-            x0=x,
-            y0=0,
-            x1=x,
-            y1=y-0.05,
-            line=dict(
-                color=config.stem_color,
-                width=config.stem_width
-            )
-        ) for x, y in zip(vcf_df["position"], y_data)]
-    )
+        # add lines
+        fig.update_layout(
+            shapes=[dict(
+                type="line",
+                xref=f"x{row}",
+                yref=f"y{row}",
+                x0=x,
+                y0=0,
+                x1=x,
+                y1=y-0.05,
+                line=dict(
+                    color=config.stem_color,
+                    width=config.stem_width
+                )
+            ) for x, y in zip(vcf_subset["position"], y_data)]
+        )
     # not need to show yaxis if af is not in vcf
     if "AF" not in vcf_df:
         fig.update_yaxes(visible=False, row=row, col=1)
