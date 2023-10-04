@@ -47,7 +47,7 @@ def create_coverage_plot(fig, row, coverage_df):
             x=[min(coverage_df["position"]), max(coverage_df["position"])],
             y=[average_cov]*2,
             text=["", f"{round(average_cov)}x"],
-            textposition="top left",
+            textposition="bottom left",
             mode="lines+text",
             line=dict(color=config.average_line_color, width=config.average_line_width, dash="dash"),
             showlegend=True,

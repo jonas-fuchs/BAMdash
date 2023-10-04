@@ -19,7 +19,7 @@ from . import _program
 
 def get_args(sysargs):
     """
-    arg parsing for virheat
+    arg parsing for bamdash
     """
     parser = argparse.ArgumentParser(
         prog=_program,
@@ -27,6 +27,7 @@ def get_args(sysargs):
     parser.add_argument(
         "-b",
         "--bam",
+        required=True,
         type=str,
         metavar=" ",
         help="bam file location"
@@ -34,6 +35,7 @@ def get_args(sysargs):
     parser.add_argument(
         "-r",
         "--reference",
+        required=True,
         type=str,
         metavar=" ",
         help="reference id"
@@ -97,16 +99,15 @@ def main(sysargs=sys.argv[1:]):
         number_of_tracks = len(args.tracks)+1
         for track in args.tracks:
             if track.endswith("vcf"):
-                track_heights = track_heights + config.vcf_track_proportion
+                track_heights = track_heights + [config.vcf_track_proportion]
             elif track.endswith("gb"):
-                track_heights = track_heights + config.gb_track_proportion
+                track_heights = track_heights + [config.gb_track_proportion]
             elif track.endswith("bed"):
-                track_heights = track_heights + config.bed_track_proportion
+                track_heights = track_heights + [config.bed_track_proportion]
             else:
                 sys.exit("one of the track types is not supported")
     else:
         number_of_tracks = 1
-
     # define layout
     fig = make_subplots(
         rows=number_of_tracks,
@@ -120,16 +121,17 @@ def main(sysargs=sys.argv[1:]):
     plotting.create_coverage_plot(fig, 1, coverage_df)
     # create track plots
     if args.tracks is not None:
-        for row, track in enumerate(args.tracks):
+        for index, track in enumerate(args.tracks):
+            row = index+2
             if track.endswith("vcf"):
                 vcf_df = data.vcf_to_df(track, args.reference)
-                plotting.create_vcf_plot(fig, row+1, vcf_df)
+                plotting.create_vcf_plot(fig, row, vcf_df)
             elif track.endswith("gb"):
                 gb_dict = data.genbank_to_dict(track, coverage_df, args.reference)
-                plotting.create_track_plot(fig, row+1, gb_dict, config.box_gb_size, config.box_gb_alpha)
+                plotting.create_track_plot(fig, row, gb_dict, config.box_gb_size, config.box_gb_alpha)
             elif track.endswith("bed"):
                 bed_dict = data.bed_to_dict(track, coverage_df, args.reference)
-                plotting.create_track_plot(fig, 4, bed_dict, config.box_bed_size, config.box_bed_alpha)
+                plotting.create_track_plot(fig, row, bed_dict, config.box_bed_size, config.box_bed_alpha)
 
     # global formatting
     fig.update_layout(
