@@ -1,3 +1,5 @@
 test.py
 .idea
 test/**
+build/**
+bamdash.egg-info/**
