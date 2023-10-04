@@ -9,11 +9,11 @@ import argparse
 # LIBS
 from plotly.subplots import make_subplots
 
-# BAMCOV
-from bamcov.scripts import data
-from bamcov.scripts import plotting
-from bamcov.scripts import config
-from bamcov import __version__
+# BAMDASH
+from bamdash.scripts import data
+from bamdash.scripts import plotting
+from bamdash.scripts import config
+from bamdash import __version__
 from . import _program
 
 
@@ -23,7 +23,7 @@ def get_args(sysargs):
     """
     parser = argparse.ArgumentParser(
         prog=_program,
-        usage='''\tbamcov -b "bam file path" -r "reference_id" [additional arguments]''')
+        usage='''\tbamdash -b "bam file path" -r "reference_id" [additional arguments]''')
     parser.add_argument(
         "-b",
         "--bam",

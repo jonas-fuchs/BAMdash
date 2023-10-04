@@ -7,8 +7,8 @@ import statistics
 # LIBS
 import plotly.graph_objects as go
 import plotly.express as px
-# BAMcov
-from bamcov.scripts import config
+# BAMDASH
+from bamdash.scripts import config
 
 
 def create_coverage_plot(fig, row, coverage_df):

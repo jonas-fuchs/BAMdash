@@ -1,5 +1,5 @@
 from setuptools import setup, find_packages
-from bamcov import __version__, _program
+from bamdash import __version__, _program
 
 # read the contents of your README file
 from pathlib import Path
@@ -7,7 +7,7 @@ this_directory = Path(__file__).parent
 long_description = (this_directory / "README.md").read_text()
 
 setup(
-    name='bamcov',
+    name='bamdash',
     long_description=long_description,
     long_description_content_type='text/markdown',
     version=__version__,
@@ -21,8 +21,8 @@ setup(
         "pysam>=0.21.0",
         "biopython>=1.79"
     ],
-    description='bamcov creates a interactive coverage dashboard with associated vcf, bed, gb tracks',
-    url='https://github.com/jonas-fuchs/BAMcov',
+    description='bamdash creates a interactive coverage dashboard optionally with vcf, bed, gb tracks',
+    url='https://github.com/jonas-fuchs/BAMdash',
     author='Dr. Jonas Fuchs',
     author_email='jonas.fuchs@uniklinik-freiburg.de',
     classifiers=[
@@ -31,7 +31,7 @@ setup(
     ],
     entry_points="""
     [console_scripts]
-    {program} = bamcov.command:main
+    {program} = bamdash.command:main
     """.format(program=_program),
     include_package_data=True,
     keywords=[],

@@ -1,5 +1,5 @@
 """
-contains config setting for BAMcov to customize the plot
+contains config setting for BAMDASH to customize the plot
 """
 
 # overall layout
