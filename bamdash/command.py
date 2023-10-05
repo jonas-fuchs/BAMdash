@@ -188,6 +188,7 @@ def main(sysargs=sys.argv[1:]):
         if config.show_log:
             fig["layout"]["yaxis"]["type"] = "log"
             fig["layout"]["yaxis"]["range"] = (0, math.log(fig["layout"]["yaxis"]["range"][1], 10))
+            fig.update_yaxes(dtick=1, row=1)
         fig.update_layout(updatemenus=[dict(visible=False)])
         # write static image
         fig.write_image(f"{args.reference}_plot.{args.export_static}", width=args.dimensions[0], height=args.dimensions[1])

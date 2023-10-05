@@ -30,7 +30,7 @@ box_gb_alpha = [0.6, 0.8]  # alpha values for boxes (gb)
 box_gb_size = [0.4, 0.3]  # size values for boxes (gb)
 
 # variant customize
-variant_marker_size = 14
+variant_marker_size = 13
 variant_marker_line_width = 1
 variant_line_color = "black"
 stem_color = "grey"

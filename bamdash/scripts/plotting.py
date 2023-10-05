@@ -166,27 +166,32 @@ def create_vcf_plot(fig, row, vcf_df):
             row=row,
             col=1
             )
-            # add lines
-            fig.update_layout(
-                shapes=[dict(
-                    type="line",
-                    xref=f"x{row}",
-                    yref=f"y{row}",
-                    x0=x,
-                    y0=0,
-                    x1=x,
-                    y1=y-0.05,
-                    line=dict(
-                        color=config.stem_color,
-                        width=config.stem_width
-                    )
-                ) for x, y in zip(vcf_subset["position"], y_data)]
+    # add stem independent of upper layers
+    if "AF" in vcf_df:
+        y_data = vcf_df["AF"]
+    else:
+        y_data = [1] * len(vcf_df["position"])
+    # add lines
+    fig.update_layout(
+        shapes=[dict(
+            type="line",
+            xref=f"x{row}",
+            yref=f"y{row}",
+            x0=x,
+            y0=0,
+            x1=x,
+            y1=y-0.05,
+            line=dict(
+                color=config.stem_color,
+                width=config.stem_width
             )
-        # not need to show yaxis if af is not in vcf
-        if "AF" not in vcf_df:
-            fig.update_yaxes(visible=False, row=row, col=1)
-        else:
-            fig.update_yaxes(title_text="frequency", range=[0, 1], row=row, col=1)
+        ) for x, y in zip(vcf_df["position"], y_data)]
+    )
+    # not need to show yaxis if af is not in vcf
+    if "AF" not in vcf_df:
+        fig.update_yaxes(visible=False, row=row, col=1)
+    else:
+        fig.update_yaxes(title_text="frequency", range=[0, 1], row=row, col=1)
 
 
 def create_track_plot(fig, row, feature_dict, box_size, box_alpha):
