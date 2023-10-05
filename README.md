@@ -10,7 +10,7 @@
 - **customize** all plotting parameters
 
 ## Example
-[<img src="./example.png" alt="varVAMP logo" />](./example.html)
+<img src="./example.png" alt="varVAMP logo" />
 
 ## Installation
 
