@@ -15,15 +15,38 @@ def make_stat_substring(stat_string, name, value):
     return stat_string + f"<b>{name}:</b> {value}    "
 
 
-def make_title_string(parsed_bam, coverage_df, reference):
+def get_coverage_stats(coverage_df, start, stop, min_cov):
+    """
+    :param coverage_df:
+    :param start: start of an annotation
+    :param stop: stop of an annotation
+    :param min_cov: min coverage to consider covered
+    :return: stats
+    """
+    df_subset = coverage_df[(coverage_df["position"] >= start) &
+                    (coverage_df["position"] <= stop) &
+                    (coverage_df["coverage"] > min_cov)]
+    if df_subset.empty:
+        mean_coverage = 0
+        recovery = 0
+    else:
+        mean_coverage = statistics.mean(df_subset["coverage"])
+        recovery = len(df_subset["coverage"])/(stop-start+1)*100
+
+    return f"{round(mean_coverage)}x", f"{round(recovery, 2)} %"
+
+
+def make_title_string(parsed_bam, coverage_df, reference, min_cov):
     """
     :param parsed_bam: parsed bam
     :param reference:reference id
     :param coverage_df: df with computed coverage
+    :param min_cov: min coverage to consider covered
     :return: string for header
     """
     # get bam stats for correct chrom
     bam_stats = parsed_bam.get_index_statistics()[0]
+    mean, rec = get_coverage_stats(coverage_df, min(coverage_df["position"]), max(coverage_df["position"]), min_cov)
     # format title string
     stat_string = ""
     stat_string = make_stat_substring(stat_string, "reference", bam_stats[0])
@@ -31,15 +54,18 @@ def make_title_string(parsed_bam, coverage_df, reference):
     gc_content = round((sum(coverage_df["C"])+sum(coverage_df["G"]))/len(coverage_df), 2)
     for bam_stat, stat_type in zip(bam_stats[1:], ["mapped", "unmapped", "total reads"]):
         stat_string = make_stat_substring(stat_string, stat_type, bam_stat)
+    stat_string = make_stat_substring(stat_string, "mean coverage", mean)
+    stat_string = make_stat_substring(stat_string, "recovery", rec)
     stat_string = make_stat_substring(stat_string, "gc content", f"{gc_content}%")
 
     return stat_string
 
 
-def bam_to_coverage_df(bam_file, ref):
+def bam_to_coverage_df(bam_file, ref, min_cov):
     """
     :param bam_file: bam location
     :param ref: chrom identifier
+    :param min_cov: min coverage to consider covered
     :return: dataframe containing coverage and percentage nucleotides per position and title with stats
     """
     # parse bam
@@ -71,7 +97,7 @@ def bam_to_coverage_df(bam_file, ref):
             "G",
             "T"
         ])
-    return coverage_df, make_title_string(bam, coverage_df, ref)
+    return coverage_df, make_title_string(bam, coverage_df, ref, min_cov)
 
 
 def vcf_to_df(vcf_file, ref):
@@ -152,12 +178,13 @@ def define_track_position(feature_dict):
     return feature_dict
 
 
-def genbank_to_dict(gb_file, coverage_df, ref):
+def genbank_to_dict(gb_file, coverage_df, ref, min_cov):
     """
     parses genbank to dic and computes coverage for each annotation
     :param gb_file: genbank record location
     :param coverage_df: df with computed coverages
     :param ref: chrom id
+    :param min_cov: min coverage to consider covered
     :return: feature_dict: dictionary with all features
     """
 
@@ -171,11 +198,9 @@ def genbank_to_dict(gb_file, coverage_df, ref):
                 feature_dict[feature.type] = {}
             start, stop = feature.location.start + 1, feature.location.end
             feature_dict[feature.type][f"{start} {stop}"] = {}
-            feature_dict[feature.type][f"{start} {stop}"]["mean coverage"] = round(
-                statistics.mean(
-                    coverage_df[(coverage_df["position"] >= start) & (coverage_df["position"] <= stop)]["coverage"]
-                )
-            )
+            mean_cov, rec = get_coverage_stats(coverage_df, start, stop, min_cov)
+            feature_dict[feature.type][f"{start} {stop}"]["mean coverage"] = mean_cov
+            feature_dict[feature.type][f"{start} {stop}"]["recovery"] = rec
             # define strand info
             if feature.strand == 1:
                 feature_dict[feature.type][f"{start} {stop}"]["strand"] = "+"
@@ -190,12 +215,13 @@ def genbank_to_dict(gb_file, coverage_df, ref):
     return define_track_position(feature_dict)
 
 
-def bed_to_dict(bed_file, coverage_df, ref):
+def bed_to_dict(bed_file, coverage_df, ref, min_cov):
     """
     parses bed file to dic and computes coverage for each annotation
     :param bed_file: bed file location
     :param coverage_df: df with computed coverages
     :param ref: chrom id
+    :param min_cov: min coverage to consider covered
     :return: bed_dict: dictionary with all features
     """
     # first extract as list of list to be able to sort
@@ -227,10 +253,9 @@ def bed_to_dict(bed_file, coverage_df, ref):
             for element, classifier in zip(line[3:], possible_classifiers):
                 bed_dict["bed annotations"][f"{start} {stop}"][classifier] = element
         # compute mean coverage
-        bed_dict["bed annotations"][f"{start} {stop}"]["mean coverage"] = round(
-            statistics.mean(
-                coverage_df[(coverage_df["position"] >= start) & (coverage_df["position"] <= stop)]["coverage"]
-            )
-        )
+        mean_cov, rec = get_coverage_stats(coverage_df, start, stop, min_cov)
+        bed_dict["bed annotations"][f"{start} {stop}"]["mean coverage"] = mean_cov
+        bed_dict["bed annotations"][f"{start} {stop}"]["recovery"] = rec
+
     return define_track_position(bed_dict)
 

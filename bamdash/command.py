@@ -52,6 +52,14 @@ def get_args(sysargs):
         help="file location of tracks"
     )
     parser.add_argument(
+        "-c",
+        "--coverage",
+        default=5,
+        type=int,
+        metavar="5",
+        help="minimum coverage"
+    )
+    parser.add_argument(
         "--slider",
         action=argparse.BooleanOptionalAction,
         default=False,
@@ -118,7 +126,7 @@ def main(sysargs=sys.argv[1:]):
         vertical_spacing=config.plot_spacing,
     )
     # create coverage plot
-    coverage_df, title = data.bam_to_coverage_df(args.bam, args.reference)
+    coverage_df, title = data.bam_to_coverage_df(args.bam, args.reference, args.coverage)
     plotting.create_coverage_plot(fig, 1, coverage_df)
     # create track plots
     if args.tracks is not None:
@@ -128,10 +136,10 @@ def main(sysargs=sys.argv[1:]):
                 vcf_df = data.vcf_to_df(track, args.reference)
                 plotting.create_vcf_plot(fig, row, vcf_df)
             elif track.endswith("gb"):
-                gb_dict = data.genbank_to_dict(track, coverage_df, args.reference)
+                gb_dict = data.genbank_to_dict(track, coverage_df, args.reference, args.coverage)
                 plotting.create_track_plot(fig, row, gb_dict, config.box_gb_size, config.box_gb_alpha)
             elif track.endswith("bed"):
-                bed_dict = data.bed_to_dict(track, coverage_df, args.reference)
+                bed_dict = data.bed_to_dict(track, coverage_df, args.reference, args.coverage)
                 plotting.create_track_plot(fig, row, bed_dict, config.box_bed_size, config.box_bed_alpha)
 
     # global formatting

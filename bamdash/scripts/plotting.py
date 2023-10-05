@@ -150,6 +150,7 @@ def create_vcf_plot(fig, row, vcf_df):
                     x=vcf_subset["position"],
                     y=y_data,
                     name=mut,
+                    legendgroup=mut,
                     mode="markers",
                     customdata=vcf_subset,
                     showlegend=show_legend,
