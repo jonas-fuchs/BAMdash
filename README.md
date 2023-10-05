@@ -45,7 +45,7 @@ usage:
 
 bamdash -b bam_file_path -r reference_id [additional arguments]
 ```
-```shell
+```
 full usage:
 
   -h, --help            show this help message and exit
