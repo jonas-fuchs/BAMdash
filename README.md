@@ -69,7 +69,7 @@ BAMcov plotting settings can be adjusted in in the `config.py`. Therefore, you h
 
 Go to the configs location:
 ```shell
-cd varVAMP/varvamp/scripts/
+cd BAMdash/bamdash/scripts/
 ```
 And open the `config.py` with a text editor, e.g.:
 ```shell
