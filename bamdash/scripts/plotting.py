@@ -68,12 +68,12 @@ def create_coverage_plot(fig, row, coverage_df):
                 direction="left",
                 buttons=list([
                     dict(
-                        args=[f"yaxis{row}.type" if row > 1 else f"yaxis.type", "linear"],
+                        args=[f"yaxis{row}.type" if row > 1 else "yaxis.type", "linear"],
                         label="linear",
                         method="relayout"
                     ),
                     dict(
-                        args=[f"yaxis{row}.type" if row > 1 else f"yaxis.type", "log"],
+                        args=[f"yaxis{row}.type" if row > 1 else "yaxis.type", "log"],
                         label="log",
                         method="relayout"
                     )
@@ -83,7 +83,7 @@ def create_coverage_plot(fig, row, coverage_df):
                 xanchor="left",
                 y=1.1,
                 yanchor="top"
-            ),
+            )
         ],
     )
 

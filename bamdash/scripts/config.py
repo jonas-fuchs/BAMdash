@@ -2,6 +2,9 @@
 contains config setting for BAMDASH to customize the plot
 """
 
+# pdf settings
+show_log = True
+
 # overall layout
 vcf_track_proportion = 0.3
 gb_track_proportion = 0.5

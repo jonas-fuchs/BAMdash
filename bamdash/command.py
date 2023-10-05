@@ -5,6 +5,7 @@ contains main workflow
 # BUILT-INS
 import sys
 import argparse
+import math
 
 # LIBS
 from plotly.subplots import make_subplots
@@ -62,7 +63,7 @@ def get_args(sysargs):
         type=str,
         metavar="None",
         default=None,
-        help="export as png, pdf, svg"
+        help="export as png, jpg, pdf, svg"
     )
     parser.add_argument(
         "-d",
@@ -183,4 +184,10 @@ def main(sysargs=sys.argv[1:]):
 
     fig.write_html(f"{args.reference}_plot.html")
     if args.export_static is not None:
+        # static image specific options
+        if config.show_log:
+            fig["layout"]["yaxis"]["type"] = "log"
+            fig["layout"]["yaxis"]["range"] = (0, math.log(fig["layout"]["yaxis"]["range"][1], 10))
+        fig.update_layout(updatemenus=[dict(visible=False)])
+        # write static image
         fig.write_image(f"{args.reference}_plot.{args.export_static}", width=args.dimensions[0], height=args.dimensions[1])
