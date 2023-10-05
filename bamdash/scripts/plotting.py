@@ -4,6 +4,8 @@ contains defs for plotting
 
 # BUILT-INS
 import statistics
+import pandas as pd
+from collections import Counter
 # LIBS
 import plotly.graph_objects as go
 import plotly.express as px
@@ -86,6 +88,30 @@ def create_coverage_plot(fig, row, coverage_df):
     )
 
 
+def split_vcf_df(df):
+    """
+    splits the vcf dataframe into multiple dfs if multiple mutations are on the same pos
+    :param df: vcf_df
+    :return: list of individual dfs
+    """
+    list_index = 0
+    unique, counter, max_n = list(Counter(df["position"]).keys()), [0]*len(set(df["position"])), max(Counter(df["position"]).values())
+
+    if max_n > 1:
+        sub_dfs = [[]]*max_n
+
+        for row in df.values.tolist():
+            for index, pos in enumerate(unique):
+                if row[0] == pos:
+                    list_index = counter[index]
+                    counter[index] += 1
+            sub_dfs[list_index] = sub_dfs[list_index] + [row]
+
+        return [pd.DataFrame(x, columns=df.columns) for x in sub_dfs]
+    else:
+        return [df]
+
+
 def create_vcf_plot(fig, row, vcf_df):
     """
     :param fig: plotly fig
@@ -93,67 +119,74 @@ def create_vcf_plot(fig, row, vcf_df):
     :param vcf_df: df with vcf info
     :return: updated figure
     """
+    # disable false positive slice warning
+    pd.options.mode.chained_assignment = None
 
     for mut, color in zip(["SNP", "INS", "DEL"], [config.snp_color, config.ins_color, config.del_color]):
         if mut not in list(vcf_df["type"]):
             continue
-        vcf_subset = vcf_df[vcf_df["type"] == mut]
-        # check if allelic frequency is present otherwise set to one
-        if "AF" in vcf_subset:
-            y_data = vcf_subset["AF"]
-        else:
-            y_data = [1] * len(vcf_subset["position"])
-        # create hover template
-        h_template = ""
-        for index, description in enumerate(list(vcf_subset.columns)):
-            # do not show position
-            if index == 0:
-                continue
-            h_template = h_template + f"<b>{description}: </b>%" + "{customdata" + f"[{index}" + "]}<br>"
-        h_template = h_template + "<extra></extra>"  # remove trace name
-        # add trace
-        fig.add_trace(
-            go.Scatter(
-                x=vcf_subset["position"],
-                y=y_data,
-                name=mut,
-                mode="markers",
-                customdata=vcf_subset,
-                showlegend=True,
-                hovertemplate=h_template,
-                marker=dict(
-                    color=color,
-                    size=config.variant_marker_size,
-                    line=dict(
-                        color=config.variant_line_color,
-                        width=config.variant_marker_line_width
+        # plot a single layer for each mutation type and again a layer
+        # if there are multiple mutations of the same type at the same position
+        vcf_subset_temp = vcf_df[vcf_df["type"] == mut]
+        vcf_subsets = split_vcf_df(vcf_subset_temp)
+        for vcf_subset, show_legend in zip(vcf_subsets, [True]+[False]*(len(vcf_subsets)-1)):
+            # check if allelic frequency is present otherwise set to one
+            if "AF" in vcf_subset:
+                vcf_subset["AF"] = vcf_subset["AF"].round(2)
+                y_data = vcf_subset["AF"]
+            else:
+                y_data = [1] * len(vcf_subset["position"])
+            # create hover template
+            h_template = ""
+            for index, description in enumerate(list(vcf_subset.columns)):
+                # do not show position
+                if index == 0:
+                    continue
+                h_template = h_template + f"<b>{description}: </b>%" + "{customdata" + f"[{index}" + "]}<br>"
+            h_template = h_template + "<extra></extra>"  # remove trace name
+            # add trace
+            fig.add_trace(
+                go.Scatter(
+                    x=vcf_subset["position"],
+                    y=y_data,
+                    name=mut,
+                    mode="markers",
+                    customdata=vcf_subset,
+                    showlegend=show_legend,
+                    hovertemplate=h_template,
+                    marker=dict(
+                        color=color,
+                        size=config.variant_marker_size,
+                        line=dict(
+                            color=config.variant_line_color,
+                            width=config.variant_marker_line_width
+                        )
                     )
-                )
-            ),
-        row=row,
-        col=1
-        )
-        # add lines
-        fig.update_layout(
-            shapes=[dict(
-                type="line",
-                xref=f"x{row}",
-                yref=f"y{row}",
-                x0=x,
-                y0=0,
-                x1=x,
-                y1=y-0.05,
-                line=dict(
-                    color=config.stem_color,
-                    width=config.stem_width
-                )
-            ) for x, y in zip(vcf_subset["position"], y_data)]
-        )
-    # not need to show yaxis if af is not in vcf
-    if "AF" not in vcf_df:
-        fig.update_yaxes(visible=False, row=row, col=1)
-    else:
-        fig.update_yaxes(title_text="frequency", range=[0, 1], row=row, col=1)
+                ),
+            row=row,
+            col=1
+            )
+            # add lines
+            fig.update_layout(
+                shapes=[dict(
+                    type="line",
+                    xref=f"x{row}",
+                    yref=f"y{row}",
+                    x0=x,
+                    y0=0,
+                    x1=x,
+                    y1=y-0.05,
+                    line=dict(
+                        color=config.stem_color,
+                        width=config.stem_width
+                    )
+                ) for x, y in zip(vcf_subset["position"], y_data)]
+            )
+        # not need to show yaxis if af is not in vcf
+        if "AF" not in vcf_df:
+            fig.update_yaxes(visible=False, row=row, col=1)
+        else:
+            fig.update_yaxes(title_text="frequency", range=[0, 1], row=row, col=1)
 
 
 def create_track_plot(fig, row, feature_dict, box_size, box_alpha):
