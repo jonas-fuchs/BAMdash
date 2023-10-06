@@ -150,14 +150,14 @@ def main(sysargs=sys.argv[1:]):
             text=title,
             x=1,
             font=dict(
-                family="Arial",
-                size=16,
-                color='#000000'
+                size=config.font_size,
             )
         ),
         font=dict(
-            family="Arial",
-            size=16,
+            family=config.font,
+            size=config.font_size,
+            color='#000000'
+
         ),
         # Add dropdown
         updatemenus=[

@@ -10,6 +10,8 @@ vcf_track_proportion = 0.3
 gb_track_proportion = 0.5
 bed_track_proportion = 0.2
 plot_spacing = 0.05
+font = "Arial"
+font_size = 16
 
 # coverage customize
 coverage_fill_color = "rgba(255, 212, 135, 0.2)"
