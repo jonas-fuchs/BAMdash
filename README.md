@@ -1,3 +1,5 @@
+<img src="./bamdash.png" alt="bamdash" />
+
 ## Overview
 
 **BAMdash lets you create interactive coverage plots from your bam file with [`plotly`](https://plotly.com/)**
@@ -10,7 +12,7 @@
 - **customize** all plotting parameters
 
 ## Example
-<img src="./example.png" alt="varVAMP logo" />
+<img src="./example.png" alt="example" />
 
 ## Installation
 
