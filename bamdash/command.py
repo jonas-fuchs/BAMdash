@@ -8,6 +8,7 @@ import argparse
 import math
 
 # LIBS
+import plotly.io as pio
 from plotly.subplots import make_subplots
 
 # BAMDASH
@@ -142,9 +143,22 @@ def main(sysargs=sys.argv[1:]):
                 bed_dict = data.bed_to_dict(track, coverage_df, args.reference, args.coverage)
                 plotting.create_track_plot(fig, row, bed_dict, config.box_bed_size, config.box_bed_alpha)
 
+    # define own templates
+    pio.templates["plotly_dark_custom"], pio.templates["plotly_white_custom"] = pio.templates["plotly_dark"], pio.templates["plotly_white"]
+    # change axis params
+    pio.templates["plotly_dark_custom"].update(
+        layout=dict(yaxis=dict(linecolor="white", tickcolor="white", zerolinecolor="rgb(17,17,17)"),
+                    xaxis=dict(linecolor="white", tickcolor="white", zerolinecolor="rgb(17,17,17)")
+                    )
+    )
+    pio.templates["plotly_white_custom"].update(
+        layout=dict(yaxis=dict(linecolor="black", tickcolor="black", zerolinecolor="white"),
+                    xaxis=dict(linecolor="black", tickcolor="black", zerolinecolor="white")
+                    )
+    )
     # global formatting
     fig.update_layout(
-        plot_bgcolor="white",
+        template="plotly_white_custom",
         hovermode="x unified",
         title=dict(
             text=title,
@@ -156,8 +170,6 @@ def main(sysargs=sys.argv[1:]):
         font=dict(
             family=config.font,
             size=config.font_size,
-            color='#000000'
-
         ),
         # Add dropdown
         updatemenus=[
@@ -174,31 +186,36 @@ def main(sysargs=sys.argv[1:]):
                         args=["yaxis.type", "log"],
                         label="log",
                         method="relayout"
-                    )
+                    ),
+                    dict(args=["template", pio.templates["plotly_white_custom"]], label="White", method="relayout"),
+                    dict(args=['template', pio.templates["plotly_dark_custom"]], label="Dark", method="relayout")
                 ]),
                 pad={"r": 10, "t": 10},
-                showactive=True,
+                showactive=False,
                 xanchor="left",
                 y=1.1,
                 yanchor="top"
             )
         ],
     )
-
     # global x axes
     fig.update_xaxes(
         mirror=False,
-        ticks="outside",
         showline=True,
-        linecolor="black",
-        range=[0, max(coverage_df["position"])]
+        linewidth=1,
+        ticks="outside",
+        minor_ticks="outside",
+        range=[0, max(coverage_df["position"])],
+        showgrid=False,
     )
     # global y axis
     fig.update_yaxes(
         mirror=False,
-        ticks="outside",
         showline=True,
-        linecolor="black"
+        linewidth=1,
+        ticks="outside",
+        minor_ticks="outside",
+        showgrid=False
     )
     # if a range slider is shown, do not display the xaxis title
     # (will be shown underneath)
@@ -216,12 +233,13 @@ def main(sysargs=sys.argv[1:]):
         fig.update_xaxes(title_text="genome position", row=number_of_tracks, col=1)
 
     fig.write_html(f"{args.reference}_plot.html")
+    # static export
     if args.export_static is not None:
         # static image specific options
-        if config.show_log:
+        if config.show_log:  # correct log layout
             fig["layout"]["yaxis"]["type"] = "log"
             fig["layout"]["yaxis"]["range"] = (0, math.log(fig["layout"]["yaxis"]["range"][1], 10))
             fig.update_yaxes(dtick=1, row=1)
-        fig.update_layout(updatemenus=[dict(visible=False)])
+        fig.update_layout(updatemenus=[dict(visible=False)])  # no buttons
         # write static image
         fig.write_image(f"{args.reference}_plot.{args.export_static}", width=args.dimensions[0], height=args.dimensions[1])
