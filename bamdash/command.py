@@ -156,6 +156,7 @@ def main(sysargs=sys.argv[1:]):
                     xaxis=dict(linecolor="black", tickcolor="black", zerolinecolor="white")
                     )
     )
+
     # global formatting
     fig.update_layout(
         template="plotly_white_custom",
@@ -173,10 +174,11 @@ def main(sysargs=sys.argv[1:]):
         ),
         # Add dropdown
         updatemenus=[
+            # log/linear
             dict(
                 type="buttons",
                 direction="left",
-                buttons=list([
+                buttons=[
                     dict(
                         args=["yaxis.type", "linear"],
                         label="linear",
@@ -186,14 +188,28 @@ def main(sysargs=sys.argv[1:]):
                         args=["yaxis.type", "log"],
                         label="log",
                         method="relayout"
-                    ),
-                    dict(args=["template", pio.templates["plotly_white_custom"]], label="White", method="relayout"),
-                    dict(args=['template', pio.templates["plotly_dark_custom"]], label="Dark", method="relayout")
-                ]),
+                    )
+                ],
                 pad={"r": 10, "t": 10},
                 showactive=False,
                 xanchor="left",
                 y=1.1,
+                yanchor="top"
+            ),
+            # darkmode
+            dict(
+                type="buttons",
+                direction="left",
+                buttons=[
+                    dict(args=[{"template": pio.templates["plotly_dark_custom"], "visible": True}],
+                         args2=[{"template": pio.templates["plotly_white_custom"], "visible": False}],
+                         label="darkmode",
+                         method="relayout"),
+                ],
+                pad={"r": 10, "t": 10},
+                showactive=False,
+                xanchor="left",
+                y=1.15,
                 yanchor="top"
             )
         ],

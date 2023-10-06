@@ -59,7 +59,7 @@ def create_coverage_plot(fig, row, coverage_df):
         col=1
     )
     # y axis title
-    fig.update_yaxes(title_text="genome coverage", range=[0, max(coverage_df["coverage"])], row=row, col=1)
+    fig.update_yaxes(range=[0, max(coverage_df["coverage"])], row=row, col=1)
 
 
 
