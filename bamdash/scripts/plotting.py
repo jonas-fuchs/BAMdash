@@ -60,32 +60,7 @@ def create_coverage_plot(fig, row, coverage_df):
     )
     # y axis title
     fig.update_yaxes(title_text="genome coverage", range=[0, max(coverage_df["coverage"])], row=row, col=1)
-    # Add dropdown
-    fig.update_layout(
-        updatemenus=[
-            dict(
-                type="buttons",
-                direction="left",
-                buttons=list([
-                    dict(
-                        args=[f"yaxis{row}.type" if row > 1 else "yaxis.type", "linear"],
-                        label="linear",
-                        method="relayout"
-                    ),
-                    dict(
-                        args=[f"yaxis{row}.type" if row > 1 else "yaxis.type", "log"],
-                        label="log",
-                        method="relayout"
-                    )
-                ]),
-                pad={"r": 10, "t": 10},
-                showactive=True,
-                xanchor="left",
-                y=1.1,
-                yanchor="top"
-            )
-        ],
-    )
+
 
 
 def split_vcf_df(df):

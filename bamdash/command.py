@@ -158,8 +158,33 @@ def main(sysargs=sys.argv[1:]):
         font=dict(
             family="Arial",
             size=16,
-        )
+        ),
+        # Add dropdown
+        updatemenus=[
+            dict(
+                type="buttons",
+                direction="left",
+                buttons=list([
+                    dict(
+                        args=["yaxis.type", "linear"],
+                        label="linear",
+                        method="relayout"
+                    ),
+                    dict(
+                        args=["yaxis.type", "log"],
+                        label="log",
+                        method="relayout"
+                    )
+                ]),
+                pad={"r": 10, "t": 10},
+                showactive=True,
+                xanchor="left",
+                y=1.1,
+                yanchor="top"
+            )
+        ],
     )
+
     # global x axes
     fig.update_xaxes(
         mirror=False,
