@@ -103,21 +103,44 @@ def main(sysargs=sys.argv[1:]):
     """
     # parse args
     args = get_args(sysargs)
-    # define subplot number and track heights
+
+    # define subplot number, track heights and parse data
+    coverage_df, title = data.bam_to_coverage_df(args.bam, args.reference, args.coverage)
     track_heights = [1]
+    track_data = []
+    # extract data and check if ref was found
     if args.tracks is not None:
         number_of_tracks = len(args.tracks)+1
         for track in args.tracks:
             if track.endswith("vcf"):
-                track_heights = track_heights + [config.vcf_track_proportion]
+                vcf_data = [data.vcf_to_df(track, args.reference), "vcf"]
+                if vcf_data[0].empty:
+                    print("WARNING: vcf data does not contain the reference id")
+                    number_of_tracks -= 1
+                else:
+                    track_heights = track_heights + [config.vcf_track_proportion]
+                    track_data.append(vcf_data)
             elif track.endswith("gb"):
-                track_heights = track_heights + [config.gb_track_proportion]
+                gb_dict, seq = data.genbank_to_dict(track, coverage_df, args.reference, args.coverage)
+                if gb_dict:
+                    track_heights = track_heights + [config.gb_track_proportion]
+                    track_data.append([gb_dict, "gb"])
+                else:
+                    print("WARNING: gb data does not contain the reference id")
+                    number_of_tracks -= 1
             elif track.endswith("bed"):
-                track_heights = track_heights + [config.bed_track_proportion]
+                bed_data = [data.bed_to_dict(track, coverage_df, args.reference, args.coverage), "bed"]
+                if bed_data[0]:
+                    track_heights = track_heights + [config.bed_track_proportion]
+                    track_data.append(bed_data)
+                else:
+                    print("WARNING: bed data does not contain the reference id")
+                    number_of_tracks -= 1
             else:
                 sys.exit("one of the track types is not supported")
     else:
         number_of_tracks = 1
+
     # define layout
     fig = make_subplots(
         rows=number_of_tracks,
@@ -127,25 +150,21 @@ def main(sysargs=sys.argv[1:]):
         vertical_spacing=config.plot_spacing,
     )
     # create coverage plot
-    coverage_df, title = data.bam_to_coverage_df(args.bam, args.reference, args.coverage)
     plotting.create_coverage_plot(fig, 1, coverage_df)
     # create track plots
-    if args.tracks is not None:
-        for index, track in enumerate(args.tracks):
+    if track_data:
+        for index, track in enumerate(track_data):
             row = index+2
-            if track.endswith("vcf"):
-                vcf_df = data.vcf_to_df(track, args.reference)
-                plotting.create_vcf_plot(fig, row, vcf_df)
-            elif track.endswith("gb"):
-                gb_dict = data.genbank_to_dict(track, coverage_df, args.reference, args.coverage)
-                plotting.create_track_plot(fig, row, gb_dict, config.box_gb_size, config.box_gb_alpha)
-            elif track.endswith("bed"):
-                bed_dict = data.bed_to_dict(track, coverage_df, args.reference, args.coverage)
-                plotting.create_track_plot(fig, row, bed_dict, config.box_bed_size, config.box_bed_alpha)
+            if track[1] == "vcf":
+                plotting.create_vcf_plot(fig, row, track[0])
+            elif track[1] == "gb":
+                plotting.create_track_plot(fig, row, track[0], config.box_gb_size, config.box_gb_alpha)
+            elif track[1] == "bed":
+                plotting.create_track_plot(fig, row, track[0], config.box_bed_size, config.box_bed_alpha)
 
     # define own templates
     pio.templates["plotly_dark_custom"], pio.templates["plotly_white_custom"] = pio.templates["plotly_dark"], pio.templates["plotly_white"]
-    # change axis params
+    # change params
     pio.templates["plotly_dark_custom"].update(
         layout=dict(yaxis=dict(linecolor="white", tickcolor="white", zerolinecolor="rgb(17,17,17)"),
                     xaxis=dict(linecolor="white", tickcolor="white", zerolinecolor="rgb(17,17,17)"),
@@ -167,7 +186,7 @@ def main(sysargs=sys.argv[1:]):
             family=config.font,
             size=config.font_size,
         ),
-        # Add dropdown
+        # Add buttons
         updatemenus=[
             dict(
                 type="buttons",
@@ -197,6 +216,7 @@ def main(sysargs=sys.argv[1:]):
                 yanchor="top"
             )
         ],
+        # add global stats as annotation
         annotations=[
             dict(text=title, y=1.14, yref="paper",
                  align="center", showarrow=False)
@@ -246,7 +266,7 @@ def main(sysargs=sys.argv[1:]):
             fig.update_yaxes(dtick=1, row=1)
         fig.update_layout(updatemenus=[dict(visible=False)])  # no buttons
         fig.update_layout(annotations=[dict(visible=False)])  # no annotations
-        # write static image (workaround so that
+        # write static image
         pio.kaleido.scope.mathjax = None  # fix so no weird box is shown
         fig.write_image(f"{args.reference}_plot.{args.export_static}", width=args.dimensions[0], height=args.dimensions[1])
 

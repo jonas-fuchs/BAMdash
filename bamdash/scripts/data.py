@@ -136,7 +136,7 @@ def vcf_to_df(vcf_file, ref):
     # clear all keys that have None appended
     empty_keys = []
     for key in variant_dict:
-        if all([x != None for x in variant_dict[key]]):
+        if all([x is not None for x in variant_dict[key]]):
             continue
         empty_keys.append(key)
     if empty_keys:
@@ -189,10 +189,12 @@ def genbank_to_dict(gb_file, coverage_df, ref, min_cov):
     """
 
     feature_dict = {}
+    seq = ""
 
     for gb_record in SeqIO.parse(open(gb_file, "r"), "genbank"):
         if gb_record.id != ref and gb_record.name != ref:
             return feature_dict
+        seq = gb_record.seq
         for feature in gb_record.features:
             if feature.type not in feature_dict:
                 feature_dict[feature.type] = {}
@@ -212,7 +214,7 @@ def genbank_to_dict(gb_file, coverage_df, ref, min_cov):
             for qualifier in feature.qualifiers:
                 feature_dict[feature.type][f"{start} {stop}"][qualifier] = feature.qualifiers[qualifier][0]
 
-    return define_track_position(feature_dict)
+    return define_track_position(feature_dict), seq
 
 
 def bed_to_dict(bed_file, coverage_df, ref, min_cov):

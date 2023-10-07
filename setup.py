@@ -21,7 +21,7 @@ setup(
         "pysam>=0.21.0",
         "biopython>=1.79"
     ],
-    description='bamdash creates a interactive coverage dashboard optionally with vcf, bed, gb tracks',
+    description='create a interactive coverage plot dashboard from bam files and add gb, vcf and bed tracks',
     url='https://github.com/jonas-fuchs/BAMdash',
     author='Dr. Jonas Fuchs',
     author_email='jonas.fuchs@uniklinik-freiburg.de',
