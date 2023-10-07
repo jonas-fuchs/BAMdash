@@ -11,6 +11,8 @@
 - **developed** for viral genomics
 - **customize** all plotting parameters
 
+**Feel free to report any bugs or request new features as issues!**
+
 ## Example
 <img src="./example.gif" alt="example" />
 
