@@ -40,7 +40,7 @@ def get_args(sysargs):
         required=True,
         type=str,
         metavar=" ",
-        help="reference id"
+        help="seq reference id"
     )
     parser.add_argument(
         "-t",
@@ -115,7 +115,7 @@ def main(sysargs=sys.argv[1:]):
             if track.endswith("vcf"):
                 vcf_data = [data.vcf_to_df(track, args.reference), "vcf"]
                 if vcf_data[0].empty:
-                    print("WARNING: vcf data does not contain the reference id")
+                    print("WARNING: vcf data does not contain the seq reference id")
                     number_of_tracks -= 1
                 else:
                     track_heights = track_heights + [config.vcf_track_proportion]
@@ -124,22 +124,37 @@ def main(sysargs=sys.argv[1:]):
                 gb_dict, seq = data.genbank_to_dict(track, coverage_df, args.reference, args.coverage)
                 if gb_dict:
                     track_heights = track_heights + [config.gb_track_proportion]
-                    track_data.append([gb_dict, "gb"])
+                    track_data.append([gb_dict, "gb", seq])
                 else:
-                    print("WARNING: gb data does not contain the reference id")
+                    print("WARNING: gb data does not contain the seq reference id")
                     number_of_tracks -= 1
             elif track.endswith("bed"):
                 bed_data = [data.bed_to_dict(track, coverage_df, args.reference, args.coverage), "bed"]
-                if bed_data[0]:
+                if bed_data[0]["bed annotations"]:
                     track_heights = track_heights + [config.bed_track_proportion]
                     track_data.append(bed_data)
                 else:
-                    print("WARNING: bed data does not contain the reference id")
+                    print("WARNING: bed data does not contain the seq reference id")
                     number_of_tracks -= 1
             else:
-                sys.exit("one of the track types is not supported")
+                sys.exit("one of the track types is not supported (supported are *.vcf, *.bed and *.gb")
     else:
         number_of_tracks = 1
+
+    # annotate mutation effects in vcf file if gb is present
+    positions = [None, None]  # index of gb and vcf
+    for index, track in enumerate(track_data):
+        if "gb" in track[1]:
+            positions[0] = index
+        if "vcf" in track[1]:
+            positions[1] = index
+    if None not in positions:
+        # check again that there is no empty data
+        if track_data[positions[0]][0] and not track_data[positions[1]][0].empty:
+            gb_dict = track_data[positions[0]][0]
+            seq = track_data[positions[0]][2]
+            vcf_df = track_data[positions[1]][0]
+            print("todo")
 
     # define layout
     fig = make_subplots(
