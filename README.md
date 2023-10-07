@@ -12,7 +12,7 @@
 - **customize** all plotting parameters
 
 ## Example
-<img src="./example.png" alt="example" />
+<img src="./example.gif" alt="example" />
 
 ## Installation
 

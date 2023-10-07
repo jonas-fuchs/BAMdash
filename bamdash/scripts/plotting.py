@@ -36,7 +36,9 @@ def create_coverage_plot(fig, row, coverage_df):
             fillcolor=config.coverage_fill_color,
             line=dict(color=config.coverage_line_color),
             hovertemplate=h_template,
-            name="coverage",
+            legendgroup="coverage",
+            legendgrouptitle_text="coverage",
+            name="",
             showlegend=True
         ),
         row=row,
@@ -53,7 +55,9 @@ def create_coverage_plot(fig, row, coverage_df):
             mode="lines+text",
             line=dict(color=config.average_line_color, width=config.average_line_width, dash="dash"),
             showlegend=True,
-            name="average"
+            legendgroup="average",
+            name="",
+            legendgrouptitle_text="average",
         ),
         row=row,
         col=1
@@ -124,8 +128,9 @@ def create_vcf_plot(fig, row, vcf_df):
                 go.Scatter(
                     x=vcf_subset["position"],
                     y=y_data,
-                    name=mut,
+                    name="",
                     legendgroup=mut,
+                    legendgrouptitle_text=mut,
                     mode="markers",
                     customdata=vcf_subset,
                     showlegend=show_legend,

@@ -148,12 +148,14 @@ def main(sysargs=sys.argv[1:]):
     # change axis params
     pio.templates["plotly_dark_custom"].update(
         layout=dict(yaxis=dict(linecolor="white", tickcolor="white", zerolinecolor="rgb(17,17,17)"),
-                    xaxis=dict(linecolor="white", tickcolor="white", zerolinecolor="rgb(17,17,17)")
+                    xaxis=dict(linecolor="white", tickcolor="white", zerolinecolor="rgb(17,17,17)"),
+                    updatemenudefaults=dict(bgcolor="rgb(115, 115, 115)")
                     )
     )
     pio.templates["plotly_white_custom"].update(
         layout=dict(yaxis=dict(linecolor="black", tickcolor="black", zerolinecolor="white"),
-                    xaxis=dict(linecolor="black", tickcolor="black", zerolinecolor="white")
+                    xaxis=dict(linecolor="black", tickcolor="black", zerolinecolor="white"),
+                    updatemenudefaults=dict(bgcolor="rgb(204, 204, 204)")
                     )
     )
 
@@ -161,20 +163,12 @@ def main(sysargs=sys.argv[1:]):
     fig.update_layout(
         template="plotly_white_custom",
         hovermode="x unified",
-        title=dict(
-            text=title,
-            x=1,
-            font=dict(
-                size=config.font_size,
-            )
-        ),
         font=dict(
             family=config.font,
             size=config.font_size,
         ),
         # Add dropdown
         updatemenus=[
-            # log/linear
             dict(
                 type="buttons",
                 direction="left",
@@ -188,31 +182,25 @@ def main(sysargs=sys.argv[1:]):
                         args=["yaxis.type", "log"],
                         label="log",
                         method="relayout"
-                    )
-                ],
-                pad={"r": 10, "t": 10},
-                showactive=False,
-                xanchor="left",
-                y=1.1,
-                yanchor="top"
-            ),
-            # darkmode
-            dict(
-                type="buttons",
-                direction="left",
-                buttons=[
+                    ),
                     dict(args=[{"template": pio.templates["plotly_dark_custom"], "visible": True}],
-                         args2=[{"template": pio.templates["plotly_white_custom"], "visible": False}],
-                         label="darkmode",
+                         label="dark",
+                         method="relayout"),
+                    dict(args=[{"template": pio.templates["plotly_white_custom"], "visible": True}],
+                         label="light",
                          method="relayout"),
                 ],
-                pad={"r": 10, "t": 10},
+                pad={"r": 10, "t": 1},
                 showactive=False,
                 xanchor="left",
                 y=1.15,
                 yanchor="top"
             )
         ],
+        annotations=[
+            dict(text=title, y=1.14, yref="paper",
+                 align="center", showarrow=False)
+        ]
     )
     # global x axes
     fig.update_xaxes(
@@ -257,5 +245,8 @@ def main(sysargs=sys.argv[1:]):
             fig["layout"]["yaxis"]["range"] = (0, math.log(fig["layout"]["yaxis"]["range"][1], 10))
             fig.update_yaxes(dtick=1, row=1)
         fig.update_layout(updatemenus=[dict(visible=False)])  # no buttons
-        # write static image
+        fig.update_layout(annotations=[dict(visible=False)])  # no annotations
+        # write static image (workaround so that
+        pio.kaleido.scope.mathjax = None  # fix so no weird box is shown
         fig.write_image(f"{args.reference}_plot.{args.export_static}", width=args.dimensions[0], height=args.dimensions[1])
+

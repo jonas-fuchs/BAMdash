@@ -52,9 +52,9 @@ def make_title_string(parsed_bam, coverage_df, reference, min_cov):
     stat_string = make_stat_substring(stat_string, "reference", bam_stats[0])
     stat_string = make_stat_substring(stat_string, "reference length", f"{parsed_bam.get_reference_length(reference)} bp")
     gc_content = round((sum(coverage_df["C"])+sum(coverage_df["G"]))/len(coverage_df), 2)
-    for bam_stat, stat_type in zip(bam_stats[1:], ["mapped", "unmapped", "total reads"]):
+    for bam_stat, stat_type in zip(bam_stats[1:], ["mapped", "unmapped", "total"]):
         stat_string = make_stat_substring(stat_string, stat_type, bam_stat)
-    stat_string = make_stat_substring(stat_string, "mean coverage", mean)
+    stat_string = make_stat_substring(stat_string, "<br>mean coverage", mean)
     stat_string = make_stat_substring(stat_string, "recovery", rec)
     stat_string = make_stat_substring(stat_string, "gc content", f"{gc_content}%")
 
