@@ -2,8 +2,10 @@
 <img src="./bamdash.png" alt="bamdash" />
 
 [![language](https://img.shields.io/badge/python-%3E3.9-green)](https://www.python.org/)
-[![License: GPL v3](https://img.shields.io/github/license/jonas-fuchs/varvamp)](https://www.gnu.org/licenses/gpl-3.0)
+[![License: GPL v3](https://img.shields.io/github/license/jonas-fuchs/bamdash)](https://www.gnu.org/licenses/gpl-3.0)
 ![Static Badge](https://img.shields.io/badge/platform-linux_osx-blue)
+[![PiPy](https://img.shields.io/pypi/v/bamdash?label=pypi%20version)](https://pypi.org/project/varvamp/)
+[![PiPy](https://static.pepy.tech/personalized-badge/bamdash?period=total&units=international_system&left_color=grey&right_color=green&left_text=pypi%20downloads)](https://pypi.org/project/bamdash/)
 
 ## Overview
 
