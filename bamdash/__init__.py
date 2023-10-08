@@ -1,3 +1,3 @@
 """interactively visualize coverage and tracks"""
 _program = "bamdash"
-__version__ = "0.0"
+__version__ = "0.1"

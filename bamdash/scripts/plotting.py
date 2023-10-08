@@ -36,7 +36,9 @@ def create_coverage_plot(fig, row, coverage_df):
             fillcolor=config.coverage_fill_color,
             line=dict(color=config.coverage_line_color),
             hovertemplate=h_template,
-            name="coverage",
+            legendgroup="coverage",
+            legendgrouptitle_text="coverage",
+            name="",
             showlegend=True
         ),
         row=row,
@@ -53,39 +55,16 @@ def create_coverage_plot(fig, row, coverage_df):
             mode="lines+text",
             line=dict(color=config.average_line_color, width=config.average_line_width, dash="dash"),
             showlegend=True,
-            name="average"
+            legendgroup="average",
+            name="",
+            legendgrouptitle_text="average",
         ),
         row=row,
         col=1
     )
     # y axis title
-    fig.update_yaxes(title_text="genome coverage", range=[0, max(coverage_df["coverage"])], row=row, col=1)
-    # Add dropdown
-    fig.update_layout(
-        updatemenus=[
-            dict(
-                type="buttons",
-                direction="left",
-                buttons=list([
-                    dict(
-                        args=[f"yaxis{row}.type" if row > 1 else "yaxis.type", "linear"],
-                        label="linear",
-                        method="relayout"
-                    ),
-                    dict(
-                        args=[f"yaxis{row}.type" if row > 1 else "yaxis.type", "log"],
-                        label="log",
-                        method="relayout"
-                    )
-                ]),
-                pad={"r": 10, "t": 10},
-                showactive=True,
-                xanchor="left",
-                y=1.1,
-                yanchor="top"
-            )
-        ],
-    )
+    fig.update_yaxes(range=[0, max(coverage_df["coverage"])], row=row, col=1)
+
 
 
 def split_vcf_df(df):
@@ -149,8 +128,9 @@ def create_vcf_plot(fig, row, vcf_df):
                 go.Scatter(
                     x=vcf_subset["position"],
                     y=y_data,
-                    name=mut,
+                    name=f"plot {row}",
                     legendgroup=mut,
+                    legendgrouptitle_text=mut,
                     mode="markers",
                     customdata=vcf_subset,
                     showlegend=show_legend,
@@ -173,8 +153,7 @@ def create_vcf_plot(fig, row, vcf_df):
     else:
         y_data = [1] * len(vcf_df["position"])
     # add lines
-    fig.update_layout(
-        shapes=[dict(
+    shapes = [dict(
             type="line",
             xref=f"x{row}",
             yref=f"y{row}",
@@ -187,7 +166,12 @@ def create_vcf_plot(fig, row, vcf_df):
                 width=config.stem_width
             )
         ) for x, y in zip(vcf_df["position"], y_data)]
-    )
+    # plot shape in each subplot
+    if fig["layout"]["shapes"]:
+        for shape in shapes:
+            fig.add_shape(shape)
+    else:
+        fig.update_layout(shapes=shapes)
     # not need to show yaxis if af is not in vcf
     if "AF" not in vcf_df:
         fig.update_yaxes(visible=False, row=row, col=1)
@@ -202,6 +186,7 @@ def create_track_plot(fig, row, feature_dict, box_size, box_alpha):
     :param feature_dict: all infos for tracks as dictionary
     :param box_size: list of box sizes
     :param box_alpha: list of box alpha values
+    :param subplot: subplot index of the plot
     :return: updated figure
     """
     # define colors
@@ -220,7 +205,7 @@ def create_track_plot(fig, row, feature_dict, box_size, box_alpha):
             if cycle == 2:
                 cycle = 0
             # get various plot info
-            positions = [int(x) for x in annotation.split(" ")]
+            positions = [feature_dict[feature][annotation]["start"], feature_dict[feature][annotation]["stop"]]
             track = feature_dict[feature][annotation]["track"]
             # define strand marker
             if feature_dict[feature][annotation]["strand"] == "+":
@@ -272,7 +257,7 @@ def create_track_plot(fig, row, feature_dict, box_size, box_alpha):
                     line=dict(color=color_thes[cycle]),
                     showlegend=legend_vis,
                     hoverinfo='skip',
-                    name="",
+                    name=f"plot {row}",
                     legendgroup=feature,
                     legendgrouptitle_text=feature,
                 ),

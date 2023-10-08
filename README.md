@@ -1,4 +1,9 @@
+
 <img src="./bamdash.png" alt="bamdash" />
+
+[![language](https://img.shields.io/badge/python-%3E3.9-green)](https://www.python.org/)
+[![License: GPL v3](https://img.shields.io/github/license/jonas-fuchs/varvamp)](https://www.gnu.org/licenses/gpl-3.0)
+![Static Badge](https://img.shields.io/badge/platform-linux_osx-blue)
 
 ## Overview
 
@@ -8,15 +13,19 @@
 - **create** a interactive `html` for data exploration
 - **create** a static image (`jpg`, `png`, `pdf`, `svg`) ready for publication
 - **add** additional tracks (supported: `.vcf`, `.gb`, `.bed`)
+- **annotate** tracks with coverage data and vcf with additional information if a `.gb` file is provided
+- **export** annoated track data as tabular files (`.bed`, `.vcf`) or json (`.gb`)
 - **developed** for viral genomics
 - **customize** all plotting parameters
 
+**Feel free to report any bugs or request new features as issues!**
+
 ## Example
-<img src="./example.png" alt="example" />
+<img src="./example.gif" alt="example" />
 
 ## Installation
 
-### via pip (recommened, coming soon):
+### via pip (recommened):
 ```shell
 pip install bamdash
 ```
@@ -52,7 +61,7 @@ full usage:
 
   -h, --help            show this help message and exit
   -b  , --bam           bam file location
-  -r  , --reference     reference id
+  -r  , --reference     seq reference id
   -t [track_1 ...], --tracks [track_1 ...]
                         file location of tracks
   -c 5, --coverage 5    minimum coverage
@@ -62,6 +71,7 @@ full usage:
                         export as png, jpg, pdf, svg
   -d px px, --dimensions px px
                         width and height of the static image in px
+  --dump, --no-dump     dump annotated track data (default: False)
   -v, --version         show program's version number and exit
 ```
 
@@ -96,7 +106,7 @@ average_line_width = 1
 
 # track customize
 track_color_scheme = "agsunset"  # for mutiple annotations tracks (genebank)
-track_color_single = "rgb(145, 145, 145)"  # for single tracks (any rgb value, but no name colors)
+track_color_single = "rgb(145, 145, 145)"  # for single tracks (any rgb value, but no named colors)
 strand_types = ["triangle-right", "triangle-left", "diamond-wide"]  # +, -, undefined strand
 strand_marker_size = 8
 strand_marker_line_width = 1
@@ -120,6 +130,9 @@ To apply these new settings just repeat the installation procedure in the BAMdas
 ```shell
 pip install .
 ```
+
+<a href="https://www.buymeacoffee.com/jofox" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a>
+
 
 ---
 
