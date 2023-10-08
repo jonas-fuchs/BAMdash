@@ -25,7 +25,7 @@
 
 ## Installation
 
-### via pip (recommened, coming soon):
+### via pip (recommened):
 ```shell
 pip install bamdash
 ```

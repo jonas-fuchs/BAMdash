@@ -149,20 +149,8 @@ def main(sysargs=sys.argv[1:]):
     else:
         number_of_tracks = 1
 
-    # annotate mutation effects in vcf file if gb is present
-    positions = [None, None]  # index of gb and vcf
-    for index, track in enumerate(track_data):
-        if "gb" in track[1]:
-            positions[0] = index
-        if "vcf" in track[1]:
-            positions[1] = index
-    if None not in positions:
-        # check again that there is no empty data
-        if track_data[positions[0]][0] and not track_data[positions[1]][0].empty:
-            gb_dict = track_data[positions[0]][0]
-            seq = track_data[positions[0]][2]
-            vcf_df = track_data[positions[1]][0]
-            print("todo")
+    # annotate if one gb and vcfs are in tracks
+    track_data = data.annotate_vcfs_in_tracks(track_data)
 
     # define layout
     fig = make_subplots(
@@ -278,10 +266,8 @@ def main(sysargs=sys.argv[1:]):
     else:
         # last x axis
         fig.update_xaxes(title_text="genome position", row=number_of_tracks, col=1)
-
     # html export
     fig.write_html(f"{args.reference}_plot.html")
-
     # static image export
     if args.export_static is not None:
         # static image specific options
@@ -296,14 +282,18 @@ def main(sysargs=sys.argv[1:]):
         fig.write_image(f"{args.reference}_plot.{args.export_static}", width=args.dimensions[0], height=args.dimensions[1])
 
     # dump track data
+    vcf_track_count, bed_track_count, gb_track_count = 0, 0, 0
     if args.dump and track_data:
         for track in track_data:
             if track[1] == "vcf":
-                track[0].to_csv(f"{args.reference}_vcf_data.tabular", sep="\t", header=True, index=False)
+                track[0].to_csv(f"{args.reference}_vcf_data_{vcf_track_count}.tabular", sep="\t", header=True, index=False)
+                vcf_track_count += 1
             elif track[1] == "bed":
                 bed_df = pd.DataFrame.from_dict(track[0]["bed annotations"], orient="index")
                 bed_df.drop("track", axis=1, inplace=True)
-                bed_df.to_csv(f"{args.reference}_bed_data.tabular", sep="\t", header=True, index=False)
+                bed_df.to_csv(f"{args.reference}_bed_data_{bed_track_count}.tabular", sep="\t", header=True, index=False)
+                bed_track_count += 1
             elif track[1] == "gb":
-                with open(f"{args.reference}_gb_data.json", "w") as fp:
+                with open(f"{args.reference}_gb_data_{gb_track_count}.json", "w") as fp:
                     json.dump(track[0], fp)
+                gb_track_count += 1

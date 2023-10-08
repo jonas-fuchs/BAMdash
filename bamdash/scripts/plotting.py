@@ -128,7 +128,7 @@ def create_vcf_plot(fig, row, vcf_df):
                 go.Scatter(
                     x=vcf_subset["position"],
                     y=y_data,
-                    name="",
+                    name=f"plot {row}",
                     legendgroup=mut,
                     legendgrouptitle_text=mut,
                     mode="markers",
@@ -153,8 +153,7 @@ def create_vcf_plot(fig, row, vcf_df):
     else:
         y_data = [1] * len(vcf_df["position"])
     # add lines
-    fig.update_layout(
-        shapes=[dict(
+    shapes = [dict(
             type="line",
             xref=f"x{row}",
             yref=f"y{row}",
@@ -167,7 +166,12 @@ def create_vcf_plot(fig, row, vcf_df):
                 width=config.stem_width
             )
         ) for x, y in zip(vcf_df["position"], y_data)]
-    )
+    # plot shape in each subplot
+    if fig["layout"]["shapes"]:
+        for shape in shapes:
+            fig.add_shape(shape)
+    else:
+        fig.update_layout(shapes=shapes)
     # not need to show yaxis if af is not in vcf
     if "AF" not in vcf_df:
         fig.update_yaxes(visible=False, row=row, col=1)
@@ -182,6 +186,7 @@ def create_track_plot(fig, row, feature_dict, box_size, box_alpha):
     :param feature_dict: all infos for tracks as dictionary
     :param box_size: list of box sizes
     :param box_alpha: list of box alpha values
+    :param subplot: subplot index of the plot
     :return: updated figure
     """
     # define colors
@@ -252,7 +257,7 @@ def create_track_plot(fig, row, feature_dict, box_size, box_alpha):
                     line=dict(color=color_thes[cycle]),
                     showlegend=legend_vis,
                     hoverinfo='skip',
-                    name="",
+                    name=f"plot {row}",
                     legendgroup=feature,
                     legendgrouptitle_text=feature,
                 ),

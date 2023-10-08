@@ -6,6 +6,7 @@ import statistics
 
 # LIBS
 import pandas as pd
+from Bio import Seq
 from Bio import SeqIO
 import pysam
 from pysam import VariantFile
@@ -277,4 +278,101 @@ def bed_to_dict(bed_file, coverage_df, ref, min_cov):
         bed_dict["bed annotations"][f"{start} {stop}"]["recovery"] = rec
 
     return define_track_position(bed_dict)
+
+
+def annotate_vcf_df(vcf_df, cds_dict, seq):
+    """
+    annotate mutations for their as effect
+    :param vcf_df: dataframe with vcf data
+    :param cds_dict: dictionary with all coding sequences
+    :param seq: sequence of the reference
+    :return: annotated df
+    """
+
+    proteins, as_exchange, as_effect = [], [], []
+
+    for variant in vcf_df.iterrows():
+        proteins_temp, as_exchange_temp, as_effect_temp = [], [], []
+        pos, mut_type, mut = variant[1]["position"], variant[1]["type"], variant[1]["mutation"]
+        # check each cds for potential mutations
+        for cds in cds_dict:
+            # check if a protein identifier is present
+            if "protein_id" not in cds_dict[cds]:
+                continue
+            start, stop = cds_dict[cds]["start"], cds_dict[cds]["stop"]
+            # check if pos is in range
+            if pos not in range(start, stop):
+                continue
+            # now we know the protein
+            proteins_temp.append(cds_dict[cds]["protein_id"])
+            # at the moment only check SNPs
+            if mut_type != "SNP":
+                as_exchange_temp.append("AMBIG"), as_effect_temp.append(variant[1]["type"])
+                continue
+            # now we can analyse for a potential as exchange
+            strand, seq_mut, codon_start = cds_dict[cds]["strand"], str(seq), int(cds_dict[cds]["codon_start"])
+            # mutate the sequence and get the CDS nt seq
+            seq_mut = Seq.Seq(seq_mut[:pos] + mut + seq_mut[pos+1:])
+            seq_cds, seq_mut_cds = seq[start+codon_start-2:stop], seq_mut[start+codon_start-2:stop]
+            # translate strand depend
+            if strand == "+":
+                cds_trans, cds_mut_trans = seq_cds.translate(), seq_mut_cds.translate()
+            else:
+                cds_trans, cds_mut_trans = seq_cds.reverse_complement().translate(), seq_mut_cds.reverse_complement().translate()
+            # get the mutation by searching for a diff between string  - prop a bit slow
+            mut_string = [f"{x}{i+1}{y}" for i, (x, y) in enumerate(zip(cds_trans, cds_mut_trans)) if x != y]
+            # now append to list
+            if not mut_string:
+                as_exchange_temp.append("NONE"), as_effect_temp.append("SYN")
+            else:
+                as_exchange_temp.append(mut_string[0]), as_effect_temp.append("NON-SYN")
+        # check if we did not find a protein
+        if not proteins_temp:
+            proteins.append("NONE"), as_exchange.append("NONE"), as_effect.append("NONE")
+        # else append all mutations found in all cds
+        elif len(proteins_temp) == 1:
+            proteins.append(proteins_temp[0]), as_exchange.append(as_exchange_temp[0]), as_effect.append(as_effect_temp[0])
+        else:
+            proteins.append(" | ".join(proteins_temp)), as_exchange.append(" | ".join(as_exchange_temp)), as_effect.append(" | ".join(as_effect_temp))
+
+    # annotate and return df
+    vcf_df["protein"], vcf_df["effect"], vcf_df["as mutation"] = proteins, as_effect, as_exchange
+    return vcf_df
+
+
+def annotate_vcfs_in_tracks(track_data):
+    """
+    annotates all vcf in the tracks
+    :param track_data
+    :return: track data with annotated vcfs
+    """
+    # annotate mutation effects in vcf df if gb is present
+    index_positions = [[], []]  # index of gb and vcf
+    for index, track in enumerate(track_data):
+        if "gb" in track[1]:
+            index_positions[0].append(index)
+        elif "vcf" in track[1]:
+            index_positions[1].append(index)
+    # check if there is a gb file and a vcf file
+    if index_positions[0] and index_positions[1]:
+        # and only one gb file
+        gb_indices = index_positions[0]
+        if len(gb_indices) > 1:
+            print("WARNING: cannot annotate from multiple *.gb files!")
+            return track_data
+            # annotate each vcf df
+        for vcf_track in index_positions[1]:
+            # check if CDS is present
+            if "CDS" not in track_data[gb_indices[0]][0]:
+                continue
+            # check again that there is no empty data
+            if not track_data[vcf_track][0].empty:
+                # and then annotate the vcf dict
+                track_data[vcf_track][0] = annotate_vcf_df(
+                    track_data[vcf_track][0],  # vcf df
+                    track_data[gb_indices[0]][0]["CDS"],  # CDS dict
+                    track_data[gb_indices[0]][2]  # seq
+                )
+
+        return track_data
 
