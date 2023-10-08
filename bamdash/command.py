@@ -6,9 +6,11 @@ contains main workflow
 import sys
 import argparse
 import math
+import json
 
 # LIBS
 import plotly.io as pio
+import pandas as pd
 from plotly.subplots import make_subplots
 
 # BAMDASH
@@ -83,6 +85,12 @@ def get_args(sysargs):
         default=[1920, 1080],
         nargs=2,
         help="width and height of the static image in px"
+    )
+    parser.add_argument(
+        "--dump",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="dump annotated track data"
     )
     parser.add_argument(
         "-v",
@@ -271,8 +279,10 @@ def main(sysargs=sys.argv[1:]):
         # last x axis
         fig.update_xaxes(title_text="genome position", row=number_of_tracks, col=1)
 
+    # html export
     fig.write_html(f"{args.reference}_plot.html")
-    # static export
+
+    # static image export
     if args.export_static is not None:
         # static image specific options
         if config.show_log:  # correct log layout
@@ -285,3 +295,15 @@ def main(sysargs=sys.argv[1:]):
         pio.kaleido.scope.mathjax = None  # fix so no weird box is shown
         fig.write_image(f"{args.reference}_plot.{args.export_static}", width=args.dimensions[0], height=args.dimensions[1])
 
+    # dump track data
+    if args.dump and track_data:
+        for track in track_data:
+            if track[1] == "vcf":
+                track[0].to_csv(f"{args.reference}_vcf_data.tabular", sep="\t", header=True, index=False)
+            elif track[1] == "bed":
+                bed_df = pd.DataFrame.from_dict(track[0]["bed annotations"], orient="index")
+                bed_df.drop("track", axis=1, inplace=True)
+                bed_df.to_csv(f"{args.reference}_bed_data.tabular", sep="\t", header=True, index=False)
+            elif track[1] == "gb":
+                with open(f"{args.reference}_gb_data.json", "w") as fp:
+                    json.dump(track[0], fp)

@@ -13,6 +13,8 @@
 - **create** a interactive `html` for data exploration
 - **create** a static image (`jpg`, `png`, `pdf`, `svg`) ready for publication
 - **add** additional tracks (supported: `.vcf`, `.gb`, `.bed`)
+- **annotate** tracks with coverage data and vcf with additional information if a `.gb` file is provided
+- **export** annoated track data as tabular files (`.bed`, `.vcf`) or json (`.gb`)
 - **developed** for viral genomics
 - **customize** all plotting parameters
 
@@ -69,6 +71,7 @@ full usage:
                         export as png, jpg, pdf, svg
   -d px px, --dimensions px px
                         width and height of the static image in px
+  --dump, --no-dump     dump annotated track data (default: False)
   -v, --version         show program's version number and exit
 ```
 

@@ -33,7 +33,7 @@ def get_coverage_stats(coverage_df, start, stop, min_cov):
         mean_coverage = statistics.mean(df_subset["coverage"])
         recovery = len(df_subset["coverage"])/(stop-start+1)*100
 
-    return f"{round(mean_coverage)}x", f"{round(recovery, 2)} %"
+    return round(mean_coverage), round(recovery, 2)
 
 
 def make_title_string(parsed_bam, coverage_df, reference, min_cov):
@@ -111,7 +111,7 @@ def vcf_to_df(vcf_file, ref):
 
     # extract vcf info
     vcf_info = list(vcf.header.info)
-    variant_dict = {x: [] for x in ["position", "reference", "mutation", "type"] + vcf_info}
+    variant_dict = {x: [] for x in ["position", "reference", "mutation", "type", "point mutation type"] + vcf_info}
     # create vcf dictionary
     for rec in vcf.fetch():
         if rec.chrom != ref:
@@ -119,6 +119,16 @@ def vcf_to_df(vcf_file, ref):
         variant_dict["position"].append(rec.pos)
         variant_dict["reference"].append(rec.ref)
         variant_dict["mutation"].append(rec.alts[0])
+        # annotate the point mutation type
+        base_exchange = rec.ref + rec.alts[0]
+        if len(base_exchange) == 2:
+            if base_exchange in ["AG", "GA", "CT", "TC"]:
+                variant_dict["point mutation type"] = "transition"
+            else:
+                variant_dict["point mutation type"] = "transversion"
+        else:
+            variant_dict["point mutation type"] = "none"
+
         # get mutation type
         if len(rec.alts[0]) > len(rec.ref):
             variant_dict["type"].append("INS")
@@ -201,8 +211,10 @@ def genbank_to_dict(gb_file, coverage_df, ref, min_cov):
             start, stop = feature.location.start + 1, feature.location.end
             feature_dict[feature.type][f"{start} {stop}"] = {}
             mean_cov, rec = get_coverage_stats(coverage_df, start, stop, min_cov)
+            feature_dict[feature.type][f"{start} {stop}"]["start"] = start
+            feature_dict[feature.type][f"{start} {stop}"]["stop"] = stop
             feature_dict[feature.type][f"{start} {stop}"]["mean coverage"] = mean_cov
-            feature_dict[feature.type][f"{start} {stop}"]["recovery"] = rec
+            feature_dict[feature.type][f"{start} {stop}"]["% recovery"] = rec
             # define strand info
             if feature.strand == 1:
                 feature_dict[feature.type][f"{start} {stop}"]["strand"] = "+"
@@ -253,6 +265,8 @@ def bed_to_dict(bed_file, coverage_df, ref, min_cov):
     for line in bed_line_list:
         start, stop = int(line[1]), int(line[2])
         bed_dict["bed annotations"][f"{start} {stop}"] = {}
+        bed_dict["bed annotations"][f"{start} {stop}"]["start"] = start
+        bed_dict["bed annotations"][f"{start} {stop}"]["stop"] = stop
         # check for additional info
         if len(line) > 3:
             for element, classifier in zip(line[3:], possible_classifiers):

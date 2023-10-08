@@ -200,7 +200,7 @@ def create_track_plot(fig, row, feature_dict, box_size, box_alpha):
             if cycle == 2:
                 cycle = 0
             # get various plot info
-            positions = [int(x) for x in annotation.split(" ")]
+            positions = [feature_dict[feature][annotation]["start"], feature_dict[feature][annotation]["stop"]]
             track = feature_dict[feature][annotation]["track"]
             # define strand marker
             if feature_dict[feature][annotation]["strand"] == "+":
