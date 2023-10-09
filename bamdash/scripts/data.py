@@ -121,14 +121,14 @@ def vcf_to_df(vcf_file, ref):
         variant_dict["reference"].append(rec.ref)
         variant_dict["mutation"].append(rec.alts[0])
         # annotate the point mutation type
-        base_exchange = rec.ref + rec.alts[0]
+        base_exchange = f"{rec.ref}{rec.alts[0]}"
         if len(base_exchange) == 2:
             if base_exchange in ["AG", "GA", "CT", "TC"]:
-                variant_dict["point mutation type"] = "transition"
+                variant_dict["point mutation type"].append("TRANSITION")
             else:
-                variant_dict["point mutation type"] = "transversion"
+                variant_dict["point mutation type"].append("TRANSVERSION")
         else:
-            variant_dict["point mutation type"] = "none"
+            variant_dict["point mutation type"].append("NONE")
 
         # get mutation type
         if len(rec.alts[0]) > len(rec.ref):
@@ -289,6 +289,9 @@ def annotate_vcf_df(vcf_df, cds_dict, seq):
     :return: annotated df
     """
 
+    # define the potential identifiers to look for
+    potential_cds_identifiers = ["protein_id", "gene", "locus_tag", "product"]
+
     proteins, as_exchange, as_effect = [], [], []
 
     for variant in vcf_df.iterrows():
@@ -297,22 +300,29 @@ def annotate_vcf_df(vcf_df, cds_dict, seq):
         # check each cds for potential mutations
         for cds in cds_dict:
             # check if a protein identifier is present
-            if "protein_id" not in cds_dict[cds]:
+            if not any(identifier in potential_cds_identifiers for identifier in cds_dict[cds]):
                 continue
             start, stop = cds_dict[cds]["start"], cds_dict[cds]["stop"]
             # check if pos is in range
             if pos not in range(start, stop):
                 continue
             # now we know the protein
-            proteins_temp.append(cds_dict[cds]["protein_id"])
+            for identifier in potential_cds_identifiers:
+                if identifier in cds_dict[cds]:
+                    proteins_temp.append(cds_dict[cds][identifier])
+                    break
             # at the moment only check SNPs
             if mut_type != "SNP":
                 as_exchange_temp.append("AMBIG"), as_effect_temp.append(variant[1]["type"])
                 continue
             # now we can analyse for a potential as exchange
-            strand, seq_mut, codon_start = cds_dict[cds]["strand"], str(seq), int(cds_dict[cds]["codon_start"])
+            if "codon_start" in cds_dict[cds]:
+                codon_start = int(cds_dict[cds]["codon_start"])
+            else:
+                codon_start = 1
+            strand, seq_mut = cds_dict[cds]["strand"], str(seq)
             # mutate the sequence and get the CDS nt seq
-            seq_mut = Seq.Seq(seq_mut[:pos] + mut + seq_mut[pos+1:])
+            seq_mut = Seq.Seq(seq_mut[:pos-1] + mut + seq_mut[pos:])
             seq_cds, seq_mut_cds = seq[start+codon_start-2:stop], seq_mut[start+codon_start-2:stop]
             # translate strand depend
             if strand == "+":
