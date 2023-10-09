@@ -176,7 +176,7 @@ def create_vcf_plot(fig, row, vcf_df):
     if "AF" not in vcf_df:
         fig.update_yaxes(visible=False, row=row, col=1)
     else:
-        fig.update_yaxes(title_text="frequency", range=[0, 1], row=row, col=1)
+        fig.update_yaxes(title_text="frequency", range=[0, 1.15], row=row, col=1)
 
 
 def create_track_plot(fig, row, feature_dict, box_size, box_alpha):
