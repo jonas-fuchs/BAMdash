@@ -384,5 +384,5 @@ def annotate_vcfs_in_tracks(track_data):
                     track_data[gb_indices[0]][2]  # seq
                 )
 
-        return track_data
+    return track_data
 
