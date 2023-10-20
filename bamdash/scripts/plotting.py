@@ -4,6 +4,8 @@ contains defs for plotting
 
 # BUILT-INS
 import statistics
+import sys
+
 import pandas as pd
 from collections import Counter
 # LIBS
@@ -13,13 +15,40 @@ import plotly.express as px
 from bamdash.scripts import config
 
 
-def create_coverage_plot(fig, row, coverage_df):
+def create_coverage_plot(fig, row, coverage_df, bin_size):
     """
     :param fig: plotly fig
     :param row: where to plot
     :param coverage_df: coverage dataframe
+    :param bin_size: bin size for the coverage calculation
     :return: updated figure
     """
+    # average data if there is a bin size > 1
+    if bin_size > 1:
+        positions, coverage, a_count, c_count, g_count, t_count = [], [], [], [], [], []
+        for pos in coverage_df["position"][::bin_size]:
+            if pos == 1:
+                last_index = pos-1
+                continue
+            # get the index of the prior row (pos is one more than index)
+            index = pos - 2
+            positions.append(pos-1)
+            coverage.append(round(coverage_df.loc[last_index:index, "coverage"].mean(), 0))
+            a_count.append(round(coverage_df.loc[last_index:index, "A"].mean(), 2))
+            c_count.append(round(coverage_df.loc[last_index:index, "C"].mean(), 2))
+            g_count.append(round(coverage_df.loc[last_index:index, "G"].mean(), 2))
+            t_count.append(round(coverage_df.loc[last_index:index, "T"].mean(), 2))
+            # remember the index for the next bin start
+            last_index = pos - 1
+        # create new df for cov plot
+        coverage_df_plot = pd.DataFrame(
+            list(zip(positions, coverage, a_count, c_count, g_count, t_count)),
+            columns=["position", "coverage", "A", "C", "G", "T"]
+        )
+    elif bin_size == 1:
+        coverage_df_plot = coverage_df
+    else:
+        sys.exit("ERROR: bin size below 1 is not valid")
 
     # define hover template
     h_template = ""
@@ -29,9 +58,9 @@ def create_coverage_plot(fig, row, coverage_df):
     # add dots with info
     fig.add_trace(
         go.Scatter(
-            x=coverage_df["position"],
-            y=coverage_df["coverage"],
-            customdata=coverage_df,
+            x=coverage_df_plot["position"],
+            y=coverage_df_plot["coverage"],
+            customdata=coverage_df_plot,
             fill="tonexty",
             fillcolor=config.coverage_fill_color,
             line=dict(color=config.coverage_line_color),
@@ -63,7 +92,7 @@ def create_coverage_plot(fig, row, coverage_df):
         col=1
     )
     # y axis title
-    fig.update_yaxes(range=[0, max(coverage_df["coverage"])], row=row, col=1)
+    fig.update_yaxes(range=[1, max(coverage_df["coverage"])], row=row, col=1)
 
 
 

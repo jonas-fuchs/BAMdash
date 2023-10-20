@@ -45,6 +45,14 @@ def get_args(sysargs):
         help="seq reference id"
     )
     parser.add_argument(
+        "-bs",
+        "--binsize",
+        default=1,
+        type=int,
+        metavar=" ",
+        help="bins for the coverage plot"
+    )
+    parser.add_argument(
         "-t",
         "--tracks",
         default=None,
@@ -161,7 +169,7 @@ def main(sysargs=sys.argv[1:]):
         vertical_spacing=config.plot_spacing,
     )
     # create coverage plot
-    plotting.create_coverage_plot(fig, 1, coverage_df)
+    plotting.create_coverage_plot(fig, 1, coverage_df, args.binsize)
     # create track plots
     if track_data:
         for index, track in enumerate(track_data):
