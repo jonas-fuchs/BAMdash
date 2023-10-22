@@ -3,6 +3,7 @@ contains defs for data analysis
 """
 # BUILT INS
 import statistics
+import math
 
 # LIBS
 import pandas as pd
@@ -280,9 +281,122 @@ def bed_to_dict(bed_file, coverage_df, ref, min_cov):
     return define_track_position(bed_dict)
 
 
+def get_mutations(start, stop, cds, variant, seq):
+    """
+    classifiy the mutation effect on the amino acid level
+    inspired by SNPeff but only for cds
+
+    :param start: start of the cds
+    :param stop: stop of the cds
+    :param cds: cds dict
+    :param variant: slice of variant df
+    :param seq: sequence of the ref
+
+    :return: amino acid change, mutation effect
+    """
+
+    ac_exchange, ac_effect = "NONE", "NONE"
+
+    # get the CDS sequence, cds pos of the variant and the codon pos
+    if "codon_start" in cds:
+        codon_start = int(cds["codon_start"])
+    else:
+        codon_start = 1
+    # reverse complement depending on the cds direction
+    if cds["strand"] == "-":
+        seq_cds = seq[start + codon_start - 2:stop].reverse_complement()
+        cds_variant_pos = stop - variant["position"]
+        ref = str(Seq.Seq(variant["reference"]).reverse_complement())
+        mut = str(Seq.Seq(variant["mutation"]).reverse_complement())
+    else:
+        seq_cds = seq[start + codon_start - 2:stop]
+        cds_variant_pos = variant["position"] - start
+        ref, mut = variant["reference"], variant["mutation"]
+
+    # define codons -> get the codon with the mutation and the position in the codon
+    cds_codons = [list(seq_cds[i:i + 3]) for i in range(0, len(seq_cds), 3)]
+    mut_codon, codon_pos = math.floor(cds_variant_pos / 3), cds_variant_pos % 3  # index affected codon, codon pos
+    ref_ac = Seq.Seq("".join(cds_codons[mut_codon])).translate()  # ref aminoacid
+
+    # define the mutation
+    if variant["type"] == "SNP":
+        # get mut aminoacid
+        cds_codons[mut_codon][codon_pos] = mut
+        alt_ac = Seq.Seq("".join(cds_codons[mut_codon])).translate()
+        # define mutation type
+        if ref_ac == alt_ac:
+            return ac_exchange, "SYN"
+        # get ac mutation
+        ac_exchange = f"{ref_ac}{mut_codon + 1}{alt_ac}"
+        # check different mutations types
+        if mut_codon == 0:
+            return ac_exchange, "START_LOST"
+        if alt_ac == "*":
+            return ac_exchange, "STOP_GAINED"
+        if ref_ac == "*" and alt_ac != "*":
+            return ac_exchange, "STOP_LOST"
+        # otherwise it is non-syn
+        return ac_exchange, "NON_SYN"
+
+    elif variant["type"] == "INS":
+        # 1st case: triplet insertion
+        if (len(mut) - 1) % 3 == 0:
+            # mutate the codon
+            cds_codons[mut_codon][codon_pos] = mut
+            ins = Seq.Seq("".join(cds_codons[mut_codon])).translate()
+            ac_exchange = f"{ref_ac}{mut_codon + 1}{ins}"
+            # check different mutations types
+            if mut_codon == 0 and ins[0] != ref_ac:
+                return ac_exchange, "START_LOST"
+            if ref_ac != "*" and "*" in ins[1:]:
+                return ac_exchange, "STOP_GAINED"
+            if ref_ac == "*" and "*" not in ins:
+                return ac_exchange, "STOP_LOST"
+            if ins[0] == ref_ac:
+                return ac_exchange, "AC_INSERTION"
+            if ins[0] != ref_ac:
+                return ac_exchange, "AC_CHANGE+AC_INSERTION"
+        # 2nd case: non-triplet insertion -> frameshift
+        else:
+            return f"{ref_ac}{mut_codon + 1}fsX", "FRAMESHIFT"
+
+    elif variant["type"] == "DEL":
+        # 1st case: triplet insertion
+        if (len(ref) - 1) % 3 == 0:
+            # check if it is the last codon position -> deletion of the next x amninoacids
+            if codon_pos == 2:
+                deletion = Seq.Seq("".join(cds_codons[mut_codon]) + ref[1:]).translate()
+                new_ac = ref_ac
+            # otherwise check which codons are affected and how the new codon looks like
+            else:
+                del_codons = cds_codons[mut_codon:int(mut_codon + 1 + (len(ref) - 1) / 3)]  # affected codons
+                deletion = Seq.Seq("".join(sum(del_codons, []))).translate()
+                # define potential new amino acid by joining the respective parts of the first and last triplet
+                new_ac = Seq.Seq(
+                    "".join(
+                        del_codons[0][:codon_pos + 1] + del_codons[len(del_codons) - 1][codon_pos + 1:]
+                    )
+                ).translate()
+            ac_exchange = f"{deletion}{mut_codon + 1}{new_ac}"
+            # check different mutations types
+            if mut_codon == 0 and new_ac != "M":
+                return ac_exchange, "START_LOST"
+            if "*" in deletion and new_ac != "*":
+                return ac_exchange, "STOP_LOST"
+            if new_ac == ref_ac:
+                return ac_exchange, "AC_DELETION"
+            if new_ac != ref_ac:
+                return ac_exchange, "AC_CHANGE+AC_DELETION"
+        # 2nd case: non-triplet insertion
+        else:
+            ac_effect, ac_exchange = "FRAMESHIFT", f"{ref_ac}{mut_codon + 1}fsX"
+    # dummy return in case I missed something
+    return ac_exchange, ac_effect
+
+
 def annotate_vcf_df(vcf_df, cds_dict, seq):
     """
-    annotate mutations for their as effect
+    annotate mutations for their aminoacid effect
     :param vcf_df: dataframe with vcf data
     :param cds_dict: dictionary with all coding sequences
     :param seq: sequence of the reference
@@ -292,11 +406,10 @@ def annotate_vcf_df(vcf_df, cds_dict, seq):
     # define the potential identifiers to look for
     potential_cds_identifiers = ["protein_id", "gene", "locus_tag", "product"]
 
-    proteins, as_exchange, as_effect = [], [], []
+    proteins, ac_exchange, ac_effect = [], [], []
 
     for variant in vcf_df.iterrows():
-        proteins_temp, as_exchange_temp, as_effect_temp = [], [], []
-        pos, mut_type, mut = variant[1]["position"], variant[1]["type"], variant[1]["mutation"]
+        proteins_temp, ac_exchange_temp, ac_effect_temp = [], [], []
         # check each cds for potential mutations
         for cds in cds_dict:
             # check if a protein identifier is present
@@ -304,49 +417,31 @@ def annotate_vcf_df(vcf_df, cds_dict, seq):
                 continue
             start, stop = cds_dict[cds]["start"], cds_dict[cds]["stop"]
             # check if pos is in range
-            if pos not in range(start, stop):
+            if variant[1]["position"] not in range(start, stop+1):
                 continue
             # now we know the protein
             for identifier in potential_cds_identifiers:
                 if identifier in cds_dict[cds]:
                     proteins_temp.append(cds_dict[cds][identifier])
                     break
-            # at the moment only check SNPs
-            if mut_type != "SNP":
-                as_exchange_temp.append("AMBIG"), as_effect_temp.append(variant[1]["type"])
-                continue
-            # now we can analyse for a potential as exchange
-            if "codon_start" in cds_dict[cds]:
-                codon_start = int(cds_dict[cds]["codon_start"])
-            else:
-                codon_start = 1
-            strand, seq_mut = cds_dict[cds]["strand"], str(seq)
-            # mutate the sequence and get the CDS nt seq
-            seq_mut = Seq.Seq(seq_mut[:pos-1] + mut + seq_mut[pos:])
-            seq_cds, seq_mut_cds = seq[start+codon_start-2:stop], seq_mut[start+codon_start-2:stop]
-            # translate strand depend
-            if strand == "+":
-                cds_trans, cds_mut_trans = seq_cds.translate(), seq_mut_cds.translate()
-            else:
-                cds_trans, cds_mut_trans = seq_cds.reverse_complement().translate(), seq_mut_cds.reverse_complement().translate()
-            # get the mutation by searching for a diff between string  - prop a bit slow
-            mut_string = [f"{x}{i+1}{y}" for i, (x, y) in enumerate(zip(cds_trans, cds_mut_trans)) if x != y]
-            # now append to list
-            if not mut_string:
-                as_exchange_temp.append("NONE"), as_effect_temp.append("SYN")
-            else:
-                as_exchange_temp.append(mut_string[0]), as_effect_temp.append("NON-SYN")
+            # annotate mutations
+            amino_acid_mutations = get_mutations(start, stop, cds_dict[cds], variant[1], seq)
+            ac_exchange_temp.append(amino_acid_mutations[0]), ac_effect_temp.append(amino_acid_mutations[1])
         # check if we did not find a protein
         if not proteins_temp:
-            proteins.append("NONE"), as_exchange.append("NONE"), as_effect.append("NONE")
+            proteins.append("NONE"), ac_exchange.append("NONE"), ac_effect.append("NONE")
         # else append all mutations found in all cds
         elif len(proteins_temp) == 1:
-            proteins.append(proteins_temp[0]), as_exchange.append(as_exchange_temp[0]), as_effect.append(as_effect_temp[0])
+            proteins.append(proteins_temp[0])
+            ac_exchange.append(ac_exchange_temp[0])
+            ac_effect.append(ac_effect_temp[0])
         else:
-            proteins.append(" | ".join(proteins_temp)), as_exchange.append(" | ".join(as_exchange_temp)), as_effect.append(" | ".join(as_effect_temp))
+            proteins.append(" | ".join(proteins_temp))
+            ac_exchange.append(" | ".join(ac_exchange_temp))
+            ac_effect.append(" | ".join(ac_effect_temp))
 
     # annotate and return df
-    vcf_df["protein"], vcf_df["effect"], vcf_df["as mutation"] = proteins, as_effect, as_exchange
+    vcf_df["protein"], vcf_df["effect"], vcf_df["as mutation"] = proteins, ac_effect, ac_exchange
     return vcf_df
 
 
