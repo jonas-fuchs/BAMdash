@@ -284,7 +284,7 @@ def bed_to_dict(bed_file, coverage_df, ref, min_cov):
 def get_mutations(start, stop, cds, variant, seq):
     """
     classifiy the mutation effect on the amino acid level
-    inspired by SNPeff
+    inspired by SNPeff but only for cds
 
     :param start: start of the cds
     :param stop: stop of the cds
@@ -295,7 +295,7 @@ def get_mutations(start, stop, cds, variant, seq):
     :return: amino acid change, mutation effect
     """
 
-    as_exchange, as_effect = "NONE", "NONE"
+    ac_exchange, ac_effect = "NONE", "NONE"
 
     # get the CDS sequence, cds pos of the variant and the codon pos
     if "codon_start" in cds:
@@ -311,7 +311,7 @@ def get_mutations(start, stop, cds, variant, seq):
     else:
         seq_cds = seq[start + codon_start - 2:stop]
         cds_variant_pos = variant["position"] - start
-        ref, mut = variant["mutation"], variant["mutation"]
+        ref, mut = variant["reference"], variant["mutation"]
 
     # define codons -> get the codon with the mutation and the position in the codon
     cds_codons = [list(seq_cds[i:i + 3]) for i in range(0, len(seq_cds), 3)]
@@ -325,58 +325,73 @@ def get_mutations(start, stop, cds, variant, seq):
         alt_ac = Seq.Seq("".join(cds_codons[mut_codon])).translate()
         # define mutation type
         if ref_ac == alt_ac:
-            as_effect = "SYN"
-        elif alt_ac == "*":
-            as_exchange, as_effect = f"{ref_ac}{mut_codon + 1}{alt_ac}", "STOP_GAINED"
-        else:
-            as_exchange, as_effect = f"{ref_ac}{mut_codon + 1}{alt_ac}", "NON_SYN"
+            return ac_exchange, "SYN"
+        # get ac mutation
+        ac_exchange = f"{ref_ac}{mut_codon + 1}{alt_ac}"
+        # check different mutations types
+        if mut_codon == 0:
+            return ac_exchange, "START_LOST"
+        if alt_ac == "*":
+            return ac_exchange, "STOP_GAINED"
+        if ref_ac == "*" and alt_ac != "*":
+            return ac_exchange, "STOP_LOST"
+        # otherwise it is non-syn
+        return ac_exchange, "NON_SYN"
+
     elif variant["type"] == "INS":
         # 1st case: triplet insertion
         if (len(mut) - 1) % 3 == 0:
             # mutate the codon
             cds_codons[mut_codon][codon_pos] = mut
-            ins = Seq.Seq("".join(cds_codons[mut_codon][codon_pos])).translate()
-            # check if the 1st aminoacid has not changed ...
+            ins = Seq.Seq("".join(cds_codons[mut_codon])).translate()
+            ac_exchange = f"{ref_ac}{mut_codon + 1}{ins}"
+            # check different mutations types
+            if mut_codon == 0 and ins[0] != ref_ac:
+                return ac_exchange, "START_LOST"
+            if ref_ac != "*" and "*" in ins[1:]:
+                return ac_exchange, "STOP_GAINED"
+            if ref_ac == "*" and "*" not in ins:
+                return ac_exchange, "STOP_LOST"
             if ins[0] == ref_ac:
-                as_effect = "CODON_INSERTION"
-            # ... changed to a stop ...
-            elif "* " in ins:
-                as_effect = "STOP_GAINED"
-            # or has changed
-            else:
-                as_effect = "CODON_CHANGE+CODON_INSERTION"
-            as_exchange = f"{ref_ac}{mut_codon + 1}{ins}"
+                return ac_exchange, "AC_INSERTION"
+            if ins[0] != ref_ac:
+                return ac_exchange, "AC_CHANGE+AC_INSERTION"
         # 2nd case: non-triplet insertion -> frameshift
         else:
-            as_effect, as_exchange = "FRAMESHIFT", f"{ref_ac}{mut_codon + 1}fsX"
+            return f"{ref_ac}{mut_codon + 1}fsX", "FRAMESHIFT"
+
     elif variant["type"] == "DEL":
         # 1st case: triplet insertion
         if (len(ref) - 1) % 3 == 0:
             # check if it is the last codon position -> deletion of the next x amninoacids
             if codon_pos == 2:
-                deletion = Seq.Seq(cds_codons[mut_codon] + ref[1:]).translate()
+                deletion = Seq.Seq("".join(cds_codons[mut_codon]) + ref[1:]).translate()
                 new_ac = ref_ac
             # otherwise check which codons are affected and how the new codon looks like
             else:
                 del_codons = cds_codons[mut_codon:int(mut_codon + 1 + (len(ref) - 1) / 3)]  # affected codons
                 deletion = Seq.Seq("".join(sum(del_codons, []))).translate()
-                # define potential new amino acid by joing the first and last triplet
+                # define potential new amino acid by joining the respective parts of the first and last triplet
                 new_ac = Seq.Seq(
                     "".join(
-                        del_codons[0][:codon_pos] + del_codons[len(del_codons) - 1][codon_pos + 1:]
+                        del_codons[0][:codon_pos + 1] + del_codons[len(del_codons) - 1][codon_pos + 1:]
                     )
                 ).translate()
-            # check if the first aminoacid has changed
+            ac_exchange = f"{deletion}{mut_codon + 1}{new_ac}"
+            # check different mutations types
+            if mut_codon == 0 and new_ac != "M":
+                return ac_exchange, "START_LOST"
+            if "*" in deletion and new_ac != "*":
+                return ac_exchange, "STOP_LOST"
             if new_ac == ref_ac:
-                as_effect = "CODON_DELETION"
-            else:
-                as_effect = "CODON_CHANGE+CODON_DELETION"
-            as_exchange = f"{ref_ac}{deletion}{mut_codon + 1}{new_ac}"
+                return ac_exchange, "AC_DELETION"
+            if new_ac != ref_ac:
+                return ac_exchange, "AC_CHANGE+AC_DELETION"
         # 2nd case: non-triplet insertion
         else:
-            as_effect, as_exchange = "FRAMESHIFT", f"{ref_ac}{mut_codon + 1}fsX"
-
-    return as_exchange, as_effect
+            ac_effect, ac_exchange = "FRAMESHIFT", f"{ref_ac}{mut_codon + 1}fsX"
+    # dummy return in case I missed something
+    return ac_exchange, ac_effect
 
 
 def annotate_vcf_df(vcf_df, cds_dict, seq):
@@ -391,10 +406,10 @@ def annotate_vcf_df(vcf_df, cds_dict, seq):
     # define the potential identifiers to look for
     potential_cds_identifiers = ["protein_id", "gene", "locus_tag", "product"]
 
-    proteins, as_exchange, as_effect = [], [], []
+    proteins, ac_exchange, ac_effect = [], [], []
 
     for variant in vcf_df.iterrows():
-        proteins_temp, as_exchange_temp, as_effect_temp = [], [], []
+        proteins_temp, ac_exchange_temp, ac_effect_temp = [], [], []
         # check each cds for potential mutations
         for cds in cds_dict:
             # check if a protein identifier is present
@@ -411,22 +426,22 @@ def annotate_vcf_df(vcf_df, cds_dict, seq):
                     break
             # annotate mutations
             amino_acid_mutations = get_mutations(start, stop, cds_dict[cds], variant[1], seq)
-            as_exchange_temp.append(amino_acid_mutations[0]), as_effect_temp.append(amino_acid_mutations[1])
+            ac_exchange_temp.append(amino_acid_mutations[0]), ac_effect_temp.append(amino_acid_mutations[1])
         # check if we did not find a protein
         if not proteins_temp:
-            proteins.append("NONE"), as_exchange.append("NONE"), as_effect.append("NONE")
+            proteins.append("NONE"), ac_exchange.append("NONE"), ac_effect.append("NONE")
         # else append all mutations found in all cds
         elif len(proteins_temp) == 1:
             proteins.append(proteins_temp[0])
-            as_exchange.append(as_exchange_temp[0])
-            as_effect.append(as_effect_temp[0])
+            ac_exchange.append(ac_exchange_temp[0])
+            ac_effect.append(ac_effect_temp[0])
         else:
             proteins.append(" | ".join(proteins_temp))
-            as_exchange.append(" | ".join(as_exchange_temp))
-            as_effect.append(" | ".join(as_effect_temp))
+            ac_exchange.append(" | ".join(ac_exchange_temp))
+            ac_effect.append(" | ".join(ac_effect_temp))
 
     # annotate and return df
-    vcf_df["protein"], vcf_df["effect"], vcf_df["as mutation"] = proteins, as_effect, as_exchange
+    vcf_df["protein"], vcf_df["effect"], vcf_df["as mutation"] = proteins, ac_effect, ac_exchange
     return vcf_df
 
 
