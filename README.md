@@ -48,7 +48,7 @@ The nomenclature for the aminoacid effect is pretty simplified:
 
 - `A58Y` - Exchange at pos 58 from A to Y
 - `A58YY`- Exchange at pos 58 from A to Y and insertion of an additional Y
-- `FA58Y`- Exchange at pos 58 from A to Y and deletion of the prior F
+- `AF58Y`- Exchange at pos 58 from A to Y and deletion of the following F
 - `A58fsX` - Frameshift at pos 58
 
 ## Example
