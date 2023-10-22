@@ -30,8 +30,26 @@ BAMdash automatically computes serveral statistics:
 
 - if `-bs` is > 1 it computes the mean over the bin size in the coverage plot
 - for each track it computes recovery and mean coverage (set `-c` for the min coverage) for each element in the track
-- if a `*.vcf` is provided it annotates transitions/transversion and type of exchange (SNP, DEL, INS)
-- if a `*.gb`and `*.vcf` is provided it computes the aminoacid exchange and the effect in the CDS (inspired by but not as powerful as [snpeff](http://pcingola.github.io/SnpEff/snpeff))
+- if a `*.vcf` is provided it annotates `TRANSITION`/`TRANSVERSION` and type of exchange (`SNP`, `DEL`, `INS`)
+
+If a `*.gb`and `*.vcf` is provided BAMdash computes the aminoacid exchange and the effect in the CDS (inspired by but not as powerful as [snpeff](http://pcingola.github.io/SnpEff/snpeff)). SNP and INDEL vcf annotation supports:
+
+- `START_LOST`: INDEL or SNP start at the CDS and result in a start loss
+- `STOP_LOST`: INDEL or SNP result in the loss of the stop codon
+- `STOP_GAINED`: INDEL or SNP result in an additional stop codon
+- `SYN`: SNP does not lead to an amino acid change
+- `NON-SYN`: SNP leads to an amino acid change 
+- `AC_INSERTION`: INS that does not change already present amino acids
+- `AC_CHANGE+AC_INSERTION`: INS where the affected codon is also non-syn
+- `AC_DELETION`: DEL that does not change already present amino acids
+- `AC_CHANGE+AC_DELETION`: DEL where the affected codon is also non-syn
+
+The nomenclature for the aminoacid effect is pretty simplified:
+
+- `A58Y` - Exchange at pos 58 from A to Y
+- `A58YY`- Exchange at pos 58 from A to Y and insertion of an additional Y
+- `FA58Y`- Exchange at pos 58 from A to Y and deletion of the prior F
+- `A58fsX` - Frameshift at pos 58
 
 ## Example
 <img src="./example.gif" alt="example" />
