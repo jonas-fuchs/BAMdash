@@ -43,6 +43,7 @@ If a `*.gb`and `*.vcf` is provided BAMdash computes the aminoacid exchange and t
 - `AC_CHANGE+AC_INSERTION`: INS where the affected codon is also non-syn
 - `AC_DELETION`: DEL that does not change already present amino acids
 - `AC_CHANGE+AC_DELETION`: DEL where the affected codon is also non-syn
+- `FRAMESHIFT`: INDEL that leads to a frameshift
 
 The nomenclature for the aminoacid effect is pretty simplified:
 
