@@ -3,3 +3,4 @@ test.py
 test/**
 build/**
 bamdash.egg-info/**
+venv/**
