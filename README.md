@@ -16,12 +16,22 @@
 - **create** a interactive `html` for data exploration
 - **create** a static image (`jpg`, `png`, `pdf`, `svg`) ready for publication
 - **add** additional tracks (supported: `.vcf`, `.gb`, `.bed`)
-- **annotate** tracks with coverage data and vcf with additional information if a `.gb` file is provided
+- **annotate** tracks with additional information
 - **export** annoated track data as tabular files (`.bed`, `.vcf`) or json (`.gb`)
 - **developed** for viral genomics
 - **customize** all plotting parameters
 
 **Feel free to report any bugs or request new features as issues!**
+
+
+## Automatic annotation
+
+BAMdash automatically computes serveral statistics:
+
+- if `-bs` is > 1 it computes the mean over the bin size in the coverage plot
+- for each track it computes recovery and mean coverage (set `-c` for the min coverage) for each element in the track
+- if a `*.vcf` is provided it annotates transitions/transversion and type of exchange (SNP, DEL, INS)
+- if a `*.gb`and `*.vcf` is provided it computes the aminoacid exchange and the effect in the CDS (inspired by but not as powerful as [snpeff](http://pcingola.github.io/SnpEff/snpeff))
 
 ## Example
 <img src="./example.gif" alt="example" />
