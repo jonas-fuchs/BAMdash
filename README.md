@@ -30,7 +30,7 @@ BAMdash automatically computes serveral statistics:
 
 - if `-bs` is > 1 it computes the mean over the bin size in the coverage plot
 - for each track it computes recovery and mean coverage (set `-c` for the min coverage) for each element in the track
-- if a `*.vcf` is provided it annotates `TRANSITION`/`TRANSVERSION` and type of exchange (`SNP`, `DEL`, `INS`)
+- if a `*.vcf` is provided it annotates `TRANSITION`/`TRANSVERSION` and type of exchange (`SNP`, `DEL`, `INS)
 
 If a `*.gb`and `*.vcf` is provided BAMdash computes the aminoacid exchange and the effect in the CDS (inspired by but not as powerful as [snpeff](http://pcingola.github.io/SnpEff/snpeff)). SNP and INDEL vcf annotation supports:
 
