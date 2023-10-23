@@ -7,6 +7,8 @@
 [![DOI](https://zenodo.org/badge/700952196.svg)](https://zenodo.org/badge/latestdoi/700952196)
 [![PiPy](https://img.shields.io/pypi/v/bamdash?label=pypi%20version)](https://pypi.org/project/bamdash/)
 [![Downloads](https://static.pepy.tech/badge/bamdash)](https://pypi.org/project/bamdash/)
+[![CONDA](https://img.shields.io/conda/v/bioconda/bamdash?label=conda%20version)](https://anaconda.org/bioconda/bamdash)
+[![CONDA](https://img.shields.io/conda/dn/bioconda/bamdash?label=conda%20downloads)](https://anaconda.org/bioconda/bamdash)
 
 ## Overview
 
@@ -60,6 +62,10 @@ The nomenclature for the aminoacid effect is pretty simplified:
 ### via pip (recommened):
 ```shell
 pip install bamdash
+```
+### via conda:
+```shell
+conda install -c bioconda bamdash
 ```
 ### from this repo:
 ```shell
