@@ -269,6 +269,8 @@ def bed_to_dict(bed_file, coverage_df, ref, min_cov):
         bed_dict["bed annotations"][f"{start} {stop}"] = {}
         bed_dict["bed annotations"][f"{start} {stop}"]["start"] = start
         bed_dict["bed annotations"][f"{start} {stop}"]["stop"] = stop
+        # always add strand dummy information in case its not in bed file
+        bed_dict["bed annotations"][f"{start} {stop}"]["strand"] = "NA"
         # check for additional info
         if len(line) > 3:
             for element, classifier in zip(line[3:], possible_classifiers):
