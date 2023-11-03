@@ -394,6 +394,40 @@ def get_mutations(start, stop, cds, variant, seq):
     return ac_exchange, ac_effect
 
 
+def analyse_a3_signature(variant, seq):
+    """
+    analyse if the mutation lies in a APOBEC3 recognition site
+    (AC) or (GT) and if it is a C>T or G>A (reverse complement)
+    exchange
+
+    :param variant: slice of the variant df
+    :param seq: sequence of the ref
+
+    :return: recognition site or NONE
+    """
+
+    if variant["type"] == "SNP":
+        pos = variant["position"]
+        # for C ref check the prior nt
+        if variant["reference"] == "C":
+            site = str(seq[pos-2:pos])
+            # check if the site and mutation type is in line with A3A activity
+            if site == "TC" and variant["mutation"] == "T":
+                return "YES", f"{site[0]}>{site[1]}<"
+            else:
+                return "NO", f"{site[0]}>{site[1]}<"
+        # for G ref check the following nt
+        if variant["reference"] == "G":
+            site = str(seq[pos-1:pos+1])
+            # check if the site and mutation type is in line with A3A activity
+            if site == "GA" and variant["mutation"] == "A":
+                return "YES", f">{site[0]}<{site[1]}"
+            else:
+                return "NO", f">{site[0]}<{site[1]}"
+
+    return "NO", "-"
+
+
 def annotate_vcf_df(vcf_df, cds_dict, seq):
     """
     annotate mutations for their aminoacid effect
@@ -467,6 +501,13 @@ def annotate_vcfs_in_tracks(track_data):
             return track_data
             # annotate each vcf df
         for vcf_track in index_positions[1]:
+            # analyse for potential a3a activity
+            a3_signatures, sites = [], []
+            for variant in track_data[vcf_track][0].iterrows():
+                a3_result = analyse_a3_signature(variant[1], track_data[gb_indices[0]][2])
+                a3_signatures.append(a3_result[0]), sites.append(a3_result[1])
+            track_data[vcf_track][0]["potential APOBEC3 activity"] = a3_signatures
+            track_data[vcf_track][0]["checked site"] = sites
             # check if CDS is present
             if "CDS" not in track_data[gb_indices[0]][0]:
                 continue
