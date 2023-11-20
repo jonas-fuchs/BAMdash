@@ -115,6 +115,17 @@ full usage:
   -v, --version         show program's version number and exit
 ```
 
+## Test bamDASH
+
+- download the HEV example data:
+https://zenodo.org/api/records/10159816/files-archive 
+- extract data, cd to folder and use bamdash:
+
+```shell
+bamdash -b HEV.bam -r HEV-pat-1 -t HEV.vcf HEVprim.bed HEVamp.bed HEV.gb
+```
+
+
 ## Cutomization
 
 BAMcov plotting settings can be adjusted in in the `config.py`. Therefore, you have to clone this repo.
