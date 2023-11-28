@@ -104,7 +104,7 @@ def get_args(sysargs):
         "-v",
         "--version",
         action='version',
-        version=f"virheat {__version__}"
+        version=f"bamdash {__version__}"
     )
     if len(sysargs) < 1:
         parser.print_help()
