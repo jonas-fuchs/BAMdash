@@ -101,6 +101,8 @@ full usage:
   -h, --help            show this help message and exit
   -b  , --bam           bam file location
   -r  , --reference     seq reference id
+  -q 15, --quality-threshold 15
+                        qaulity threshold for reads
   -bs  , --binsize      bins for the coverage plot
   -t [track_1 ...], --tracks [track_1 ...]
                         file location of tracks
