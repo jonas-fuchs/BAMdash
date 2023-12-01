@@ -63,7 +63,7 @@ def make_title_string(parsed_bam, coverage_df, reference, min_cov):
     return stat_string
 
 
-def bam_to_coverage_df(bam_file, ref, min_cov):
+def bam_to_coverage_df(bam_file, ref, min_cov, quality_thres):
     """
     :param bam_file: bam location
     :param ref: chrom identifier
@@ -75,7 +75,7 @@ def bam_to_coverage_df(bam_file, ref, min_cov):
 
     coverage, position = [], []
     # count coverage at each pos
-    coverage_base = bam.count_coverage(ref)
+    coverage_base = bam.count_coverage(ref, quality_threshold=quality_thres)
     # extract overall coverage and pos
     for index, [A_count, C_count, G_count, T_count] in enumerate(
             zip(coverage_base[0], coverage_base[1], coverage_base[2], coverage_base[3])):

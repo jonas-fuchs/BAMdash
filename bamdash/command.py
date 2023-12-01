@@ -45,6 +45,14 @@ def get_args(sysargs):
         help="seq reference id"
     )
     parser.add_argument(
+        "-q",
+        "--quality-threshold",
+        type=int,
+        default=15,
+        metavar="15",
+        help="qaulity threshold for reads"
+    )
+    parser.add_argument(
         "-bs",
         "--binsize",
         default=1,
@@ -121,7 +129,7 @@ def main(sysargs=sys.argv[1:]):
     args = get_args(sysargs)
 
     # define subplot number, track heights and parse data
-    coverage_df, title = data.bam_to_coverage_df(args.bam, args.reference, args.coverage)
+    coverage_df, title = data.bam_to_coverage_df(args.bam, args.reference, args.coverage, args.quality_threshold)
     track_heights = [1]
     track_data = []
     # extract data and check if ref was found
