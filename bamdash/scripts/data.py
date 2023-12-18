@@ -32,7 +32,7 @@ def get_coverage_stats(coverage_df, start, stop, min_cov):
         mean_coverage = 0
         recovery = 0
     else:
-        mean_coverage = statistics.mean(df_subset["coverage"])
+        mean_coverage = sum(df_subset["coverage"])/(stop-start)
         recovery = len(df_subset["coverage"])/(stop-start+1)*100
 
     return round(mean_coverage), round(recovery, 2)
