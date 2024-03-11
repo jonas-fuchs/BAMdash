@@ -418,8 +418,8 @@ def analyse_a3_signature(variant, seq):
                 return "YES", f"{site[0]}>{site[1]}<"
             else:
                 return "NO", f"{site[0]}>{site[1]}<"
-        # for G ref check the following nt
-        if variant["reference"] == "G":
+        # for G ref check the following nt if the position is not at the end of the sequence
+        if variant["reference"] == "G" and variant["position"] != len(seq):
             site = str(seq[pos-1:pos+1])
             # check if the site and mutation type is in line with A3A activity
             if site == "GA" and variant["mutation"] == "A":
