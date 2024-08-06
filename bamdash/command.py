@@ -129,7 +129,7 @@ def main(sysargs=sys.argv[1:]):
     args = get_args(sysargs)
 
     # define subplot number, track heights and parse data
-    coverage_df, title = data.bam_to_coverage_df(args.bam, args.reference, args.coverage, args.quality_threshold)
+    coverage_df, title, stat_dict = data.bam_to_coverage_df(args.bam, args.reference, args.coverage, args.quality_threshold)
     track_heights = [1]
     track_data = []
     # extract data and check if ref was found
@@ -299,17 +299,19 @@ def main(sysargs=sys.argv[1:]):
 
     # dump track data
     vcf_track_count, bed_track_count, gb_track_count = 0, 0, 0
-    if args.dump and track_data:
-        for track in track_data:
-            if track[1] == "vcf":
-                track[0].to_csv(f"{args.reference}_vcf_data_{vcf_track_count}.tabular", sep="\t", header=True, index=False)
-                vcf_track_count += 1
-            elif track[1] == "bed":
-                bed_df = pd.DataFrame.from_dict(track[0]["bed annotations"], orient="index")
-                bed_df.drop("track", axis=1, inplace=True)
-                bed_df.to_csv(f"{args.reference}_bed_data_{bed_track_count}.tabular", sep="\t", header=True, index=False)
-                bed_track_count += 1
-            elif track[1] == "gb":
-                with open(f"{args.reference}_gb_data_{gb_track_count}.json", "w") as fp:
-                    json.dump(track[0], fp)
-                gb_track_count += 1
+    if args.dump:
+        pd.DataFrame.from_dict(stat_dict, orient="index").to_csv("bam_stats.tabular", sep="\t", header=False, index=True)
+        if track_data:
+            for track in track_data:
+                if track[1] == "vcf":
+                    track[0].to_csv(f"{args.reference}_vcf_data_{vcf_track_count}.tabular", sep="\t", header=True, index=False)
+                    vcf_track_count += 1
+                elif track[1] == "bed":
+                    bed_df = pd.DataFrame.from_dict(track[0]["bed annotations"], orient="index")
+                    bed_df.drop("track", axis=1, inplace=True)
+                    bed_df.to_csv(f"{args.reference}_bed_data_{bed_track_count}.tabular", sep="\t", header=True, index=False)
+                    bed_track_count += 1
+                elif track[1] == "gb":
+                    with open(f"{args.reference}_gb_data_{gb_track_count}.json", "w") as fp:
+                        json.dump(track[0], fp)
+                    gb_track_count += 1

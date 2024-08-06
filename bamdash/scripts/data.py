@@ -25,15 +25,17 @@ def get_coverage_stats(coverage_df, start, stop, min_cov):
     :param min_cov: min coverage to consider covered
     :return: stats
     """
-    df_subset = coverage_df[(coverage_df["position"] >= start) &
-                    (coverage_df["position"] <= stop) &
-                    (coverage_df["coverage"] > min_cov)]
-    if df_subset.empty:
+    df_subset_cov = coverage_df[(coverage_df["position"] >= start) & (coverage_df["position"] <= stop)]
+    df_subset_rec = coverage_df[(coverage_df["position"] >= start) & (coverage_df["position"] <= stop) & (coverage_df["coverage"] > min_cov)]
+    if df_subset_cov.empty:
         mean_coverage = 0
         recovery = 0
+    elif df_subset_rec.empty and not df_subset_cov.empty:
+        mean_coverage = sum(df_subset_cov["coverage"])/(stop-start+1)
+        recovery = 0
     else:
-        mean_coverage = sum(df_subset["coverage"])/(stop-start)
-        recovery = len(df_subset["coverage"])/(stop-start+1)*100
+        mean_coverage = sum(df_subset_cov["coverage"])/(stop-start+1)
+        recovery = len(df_subset_rec["coverage"])/(stop-start+1)*100
 
     return round(mean_coverage), round(recovery, 2)
 
@@ -46,21 +48,25 @@ def make_title_string(parsed_bam, coverage_df, reference, min_cov):
     :param min_cov: min coverage to consider covered
     :return: string for header
     """
+    stat_dict = {}
     # get bam stats for correct chrom
     bam_stats = parsed_bam.get_index_statistics()[0]
-    mean, rec = get_coverage_stats(coverage_df, min(coverage_df["position"]), max(coverage_df["position"]), min_cov)
+    # pop dict
+    stat_dict["reference"] = bam_stats[0]
+    stat_dict["reference length (bp)"] = parsed_bam.get_reference_length(reference)
+    for stat_type, bam_stat in zip(["mapped", "unmapped", "total"], bam_stats[1:]):
+        stat_dict[stat_type] = bam_stat
+    stat_dict["mean coverage"], stat_dict[f"% recovery >= {min_cov}x"] = get_coverage_stats(coverage_df, min(coverage_df["position"]), max(coverage_df["position"]), min_cov)
+    stat_dict["gc content (%)"] = round((sum(coverage_df["C"]) + sum(coverage_df["G"])) / len(coverage_df), 2)
     # format title string
     stat_string = ""
-    stat_string = make_stat_substring(stat_string, "reference", bam_stats[0])
-    stat_string = make_stat_substring(stat_string, "reference length", f"{parsed_bam.get_reference_length(reference)} bp")
-    gc_content = round((sum(coverage_df["C"])+sum(coverage_df["G"]))/len(coverage_df), 2)
-    for bam_stat, stat_type in zip(bam_stats[1:], ["mapped", "unmapped", "total"]):
-        stat_string = make_stat_substring(stat_string, stat_type, bam_stat)
-    stat_string = make_stat_substring(stat_string, "<br>mean coverage", mean)
-    stat_string = make_stat_substring(stat_string, "recovery", rec)
-    stat_string = make_stat_substring(stat_string, "gc content", f"{gc_content}%")
+    for key in stat_dict:
+        if key == "mean coverage":
+            stat_string = make_stat_substring(stat_string, f"<br>{key}", stat_dict[key])
+        else:
+            stat_string = make_stat_substring(stat_string, key, stat_dict[key])
 
-    return stat_string
+    return stat_string, stat_dict
 
 
 def bam_to_coverage_df(bam_file, ref, min_cov, quality_thres):
@@ -99,7 +105,10 @@ def bam_to_coverage_df(bam_file, ref, min_cov, quality_thres):
             "G",
             "T"
         ])
-    return coverage_df, make_title_string(bam, coverage_df, ref, min_cov)
+
+    title, stat_dict = make_title_string(bam, coverage_df, ref, min_cov)
+
+    return coverage_df, title, stat_dict
 
 
 def vcf_to_df(vcf_file, ref):
@@ -216,7 +225,7 @@ def genbank_to_dict(gb_file, coverage_df, ref, min_cov):
             feature_dict[feature.type][f"{start} {stop}"]["start"] = start
             feature_dict[feature.type][f"{start} {stop}"]["stop"] = stop
             feature_dict[feature.type][f"{start} {stop}"]["mean coverage"] = mean_cov
-            feature_dict[feature.type][f"{start} {stop}"]["% recovery"] = rec
+            feature_dict[feature.type][f"{start} {stop}"][f"% recovery >= {min_cov}x"] = rec
             # define strand info
             if feature.strand == 1:
                 feature_dict[feature.type][f"{start} {stop}"]["strand"] = "+"
@@ -278,7 +287,7 @@ def bed_to_dict(bed_file, coverage_df, ref, min_cov):
         # compute mean coverage
         mean_cov, rec = get_coverage_stats(coverage_df, start, stop, min_cov)
         bed_dict["bed annotations"][f"{start} {stop}"]["mean coverage"] = mean_cov
-        bed_dict["bed annotations"][f"{start} {stop}"]["recovery"] = rec
+        bed_dict["bed annotations"][f"{start} {stop}"][f"% recovery >= {min_cov}x"] = rec
 
     return define_track_position(bed_dict)
 
