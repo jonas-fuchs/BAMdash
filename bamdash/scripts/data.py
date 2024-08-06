@@ -30,6 +30,9 @@ def get_coverage_stats(coverage_df, start, stop, min_cov):
     if df_subset_cov.empty:
         mean_coverage = 0
         recovery = 0
+    elif df_subset_rec.empty and not df_subset_cov.empty:
+        mean_coverage = sum(df_subset_cov["coverage"])/(stop-start+1)
+        recovery = 0
     else:
         mean_coverage = sum(df_subset_cov["coverage"])/(stop-start+1)
         recovery = len(df_subset_rec["coverage"])/(stop-start+1)*100
