@@ -56,8 +56,7 @@ def make_title_string(parsed_bam, coverage_df, reference, min_cov):
     stat_dict["reference length (bp)"] = parsed_bam.get_reference_length(reference)
     for stat_type, bam_stat in zip(["mapped", "unmapped", "total"], bam_stats[1:]):
         stat_dict[stat_type] = bam_stat
-    stat_dict["mean coverage"] = round(statistics.mean(coverage_df["coverage"]))
-    stat_dict["mean coverage"], stat_dict[f"recovery >= {min_cov}x"] = get_coverage_stats(coverage_df, min(coverage_df["position"]), max(coverage_df["position"]), min_cov)
+    stat_dict["mean coverage"], stat_dict[f"% recovery >= {min_cov}x"] = get_coverage_stats(coverage_df, min(coverage_df["position"]), max(coverage_df["position"]), min_cov)
     stat_dict["gc content (%)"] = round((sum(coverage_df["C"]) + sum(coverage_df["G"])) / len(coverage_df), 2)
     # format title string
     stat_string = ""
@@ -288,7 +287,7 @@ def bed_to_dict(bed_file, coverage_df, ref, min_cov):
         # compute mean coverage
         mean_cov, rec = get_coverage_stats(coverage_df, start, stop, min_cov)
         bed_dict["bed annotations"][f"{start} {stop}"]["mean coverage"] = mean_cov
-        bed_dict["bed annotations"][f"{start} {stop}"][f"recovery >= {min_cov}x"] = rec
+        bed_dict["bed annotations"][f"{start} {stop}"][f"% recovery >= {min_cov}x"] = rec
 
     return define_track_position(bed_dict)
 
