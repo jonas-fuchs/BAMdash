@@ -51,6 +51,9 @@ def make_title_string(parsed_bam, coverage_df, reference, min_cov):
     stat_dict = {}
     # get bam stats for correct chrom
     bam_stats = parsed_bam.get_index_statistics()[0]
+    for bam_stats in parsed_bam.get_index_statistics():
+        if bam_stats[0] == reference:
+            break
     # pop dict
     stat_dict["reference"] = bam_stats[0]
     stat_dict["reference length (bp)"] = parsed_bam.get_reference_length(reference)
