@@ -300,7 +300,7 @@ def main(sysargs=sys.argv[1:]):
     # dump track data
     vcf_track_count, bed_track_count, gb_track_count = 0, 0, 0
     if args.dump:
-        pd.DataFrame.from_dict(stat_dict, orient="index").to_csv("bam_stats.tabular", sep="\t", header=False, index=True)
+        pd.DataFrame.from_dict(stat_dict, orient="index").to_csv(f"{args.reference}_bam_stats.tabular", sep="\t", header=False, index=True)
         if track_data:
             for track in track_data:
                 if track[1] == "vcf":
