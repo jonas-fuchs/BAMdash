@@ -185,7 +185,11 @@ def define_track_position(feature_dict):
         # -> move to new track
         for annotation in feature_dict[feature_type]:
             track = 0
-            positions = [int(x) for x in annotation.split(" ")]
+            try:
+                positions = [int(x) for x in annotation.split(" ")]
+            # edge case for positions that start with >
+            except ValueError:
+                positions = [int(x[1:]) for x in annotation.split(" ")]
             while positions[0] < track_stops[track]:
                 track += 1
                 # if all prior tracks are potentially causing an overlap
@@ -218,6 +222,7 @@ def genbank_to_dict(gb_file, coverage_df, ref, min_cov):
 
     for gb_record in SeqIO.parse(open(gb_file, "r"), "genbank"):
         if gb_record.id != ref and gb_record.name != ref:
+            print('WARNING: ref id does not match genbank')
             break
         seq = gb_record.seq
         for feature in gb_record.features:
@@ -231,9 +236,9 @@ def genbank_to_dict(gb_file, coverage_df, ref, min_cov):
             feature_dict[feature.type][f"{start} {stop}"]["mean coverage"] = mean_cov
             feature_dict[feature.type][f"{start} {stop}"][f"% recovery >= {min_cov}x"] = rec
             # define strand info
-            if feature.strand == 1:
+            if feature.location.strand == 1:
                 feature_dict[feature.type][f"{start} {stop}"]["strand"] = "+"
-            elif feature.strand == -1:
+            elif feature.location.strand == -1:
                 feature_dict[feature.type][f"{start} {stop}"]["strand"] = "-"
             else:
                 feature_dict[feature.type][f"{start} {stop}"]["strand"] = "NA"
