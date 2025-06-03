@@ -2,7 +2,6 @@
 contains defs for data analysis
 """
 # BUILT INS
-import statistics
 import math
 import sys
 
