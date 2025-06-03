@@ -4,6 +4,7 @@ contains defs for data analysis
 # BUILT INS
 import statistics
 import math
+import sys
 
 # LIBS
 import pandas as pd
@@ -78,6 +79,9 @@ def bam_to_coverage_df(bam_file, ref, min_cov, quality_thres):
     """
     # parse bam
     bam = pysam.AlignmentFile(bam_file, "rb")
+
+    if ref not in bam.references:
+        sys.exit(f'WARNING: ref id does not exist in bam file. Available references are {bam.references}')
 
     coverage, position = [], []
     # count coverage at each pos
