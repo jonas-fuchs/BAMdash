@@ -95,7 +95,6 @@ def create_coverage_plot(fig, row, coverage_df, bin_size):
     fig.update_yaxes(range=[1, max(coverage_df["coverage"])], row=row, col=1)
 
 
-
 def split_vcf_df(df):
     """
     splits the vcf dataframe into multiple dfs if multiple mutations are on the same pos
@@ -234,7 +233,6 @@ def create_track_plot(fig, row, feature_dict, box_size, box_alpha):
             if cycle == 2:
                 cycle = 0
             # get various plot info
-            positions = [feature_dict[feature][annotation]["start"], feature_dict[feature][annotation]["stop"]]
             track = feature_dict[feature][annotation]["track"]
             # define strand marker
             if feature_dict[feature][annotation]["strand"] == "+":
@@ -249,8 +247,10 @@ def create_track_plot(fig, row, feature_dict, box_size, box_alpha):
                 if classifier == "track" or classifier == "translation":
                     continue
                 h_text = h_text + f"<b>{classifier}: </b>{feature_dict[feature][annotation][classifier]} <br>"
+
             # define place for hover info
-            x = positions[0] + (positions[1] - positions[0]) / 2
+            global_start, global_stop = min(feature_dict[feature][annotation]["start"]), max(feature_dict[feature][annotation]["stop"])
+            x = global_start + (global_stop - global_start) / 2
             # add hover info
             fig.add_trace(
                 go.Scatter(
@@ -275,24 +275,49 @@ def create_track_plot(fig, row, feature_dict, box_size, box_alpha):
                 row=row,
                 col=1
             )
-            # add the track rectangle
-            fig.add_trace(
-                go.Scatter(
-                    x=[positions[0], positions[1], positions[1], positions[0], positions[0]],
-                    y=[track + b_size[cycle], track + b_size[cycle], track - b_size[cycle], track - b_size[cycle], track + b_size[cycle]],
-                    mode="lines",
-                    fill="toself",
-                    fillcolor=color_thes[cycle],
-                    line=dict(color=color_thes[cycle]),
-                    showlegend=legend_vis,
-                    hoverinfo='skip',
-                    name=f"plot {row}",
-                    legendgroup=feature,
-                    legendgrouptitle_text=feature,
-                ),
-                row=row,
-                col=1
-            )
+            # plot the features
+            previous_loc, previous_legend_vis = None, None
+            # plot parts separately
+            for start, stop in zip(feature_dict[feature][annotation]["start"], feature_dict[feature][annotation]["stop"]):
+                # plot a line to indicate that the feature parts belong together
+                if previous_loc is not None:
+                    if feature_dict[feature][annotation]["strand"] == '-':
+                        line_x = [min(previous_loc), max(start, stop)]
+                    else:
+                        line_x = [max(previous_loc), min(start, stop)]
+                    fig.add_trace(
+                        go.Scatter(
+                            x=[line_x[0], line_x[1]],
+                            y=[track, track],  # y-coordinate of the hline
+                            mode='lines',
+                            line=dict(color=color_thes[cycle]),
+                            legendgroup=feature,
+                            legendgrouptitle_text=feature,
+                            hoverinfo='skip',
+                            showlegend=False,
+                        ),
+                        row=row,
+                        col=1
+                    )
+                # plot the feature
+                fig.add_trace(
+                    go.Scatter(
+                        x=[start, stop, stop, start, start],
+                        y=[track + b_size[cycle], track + b_size[cycle], track - b_size[cycle], track - b_size[cycle], track + b_size[cycle]],
+                        mode="lines",
+                        fill="toself",
+                        fillcolor=color_thes[cycle],
+                        line=dict(color=color_thes[cycle]),
+                        showlegend=legend_vis if previous_legend_vis is None else False,  # edge case for tracks that start with part features and result in legend duplication
+                        hoverinfo='skip',
+                        name=f"plot {row}",
+                        legendgroup=feature,
+                        legendgrouptitle_text=feature,
+                    ),
+                    row=row,
+                    col=1
+                )
+                previous_loc, previous_legend_vis = [start, stop], legend_vis
             # switch to next cycle
             cycle += 1
     # reverse yaxis and hide it

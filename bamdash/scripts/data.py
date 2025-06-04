@@ -2,8 +2,8 @@
 contains defs for data analysis
 """
 # BUILT INS
-import statistics
 import math
+import sys
 
 # LIBS
 import pandas as pd
@@ -81,6 +81,9 @@ def bam_to_coverage_df(bam_file, ref, min_cov, quality_thres):
     """
     # parse bam
     bam = pysam.AlignmentFile(bam_file, "rb")
+
+    if ref not in bam.references:
+        sys.exit(f'WARNING: ref id does not exist in bam file. Available references are {bam.references}')
 
     coverage, position = [], []
     # count coverage at each pos
@@ -184,7 +187,7 @@ def define_track_position(feature_dict):
         # -> move to new track
         for annotation in feature_dict[feature_type]:
             track = 0
-            positions = [int(x) for x in annotation.split(" ")]
+            positions = [min(feature_dict[feature_type][annotation]['start']), max(feature_dict[feature_type][annotation]['stop'])]
             while positions[0] < track_stops[track]:
                 track += 1
                 # if all prior tracks are potentially causing an overlap
@@ -217,6 +220,7 @@ def genbank_to_dict(gb_file, coverage_df, ref, min_cov):
 
     for gb_record in SeqIO.parse(open(gb_file, "r"), "genbank"):
         if gb_record.id != ref and gb_record.name != ref:
+            print('WARNING: ref id does not match genbank')
             break
         seq = gb_record.seq
         for feature in gb_record.features:
@@ -224,15 +228,26 @@ def genbank_to_dict(gb_file, coverage_df, ref, min_cov):
                 feature_dict[feature.type] = {}
             start, stop = feature.location.start + 1, feature.location.end
             feature_dict[feature.type][f"{start} {stop}"] = {}
-            mean_cov, rec = get_coverage_stats(coverage_df, start, stop, min_cov)
-            feature_dict[feature.type][f"{start} {stop}"]["start"] = start
-            feature_dict[feature.type][f"{start} {stop}"]["stop"] = stop
+
+            # get feature location including features that have parts
+            mean_cov, rec = 0, 0
+            feature_dict[feature.type][f"{start} {stop}"]["start"], feature_dict[feature.type][f"{start} {stop}"]["stop"] = [], []
+            for part in feature.location.parts:
+                feature_dict[feature.type][f"{start} {stop}"]["start"].append(int(part.start + 1))
+                feature_dict[feature.type][f"{start} {stop}"]["stop"].append(int(part.end))
+                mean_cov_temp, rec_temp = get_coverage_stats(coverage_df, part.start + 1, part.end, min_cov)
+                mean_cov += mean_cov_temp
+                rec += rec_temp
+            # calculate the mean over mean coverages (only relevant for features that have parts)
+            mean_cov = mean_cov / len(feature.location.parts)
+            rec = rec / len(feature.location.parts)
+
             feature_dict[feature.type][f"{start} {stop}"]["mean coverage"] = mean_cov
             feature_dict[feature.type][f"{start} {stop}"][f"% recovery >= {min_cov}x"] = rec
             # define strand info
-            if feature.strand == 1:
+            if feature.location.strand == 1:
                 feature_dict[feature.type][f"{start} {stop}"]["strand"] = "+"
-            elif feature.strand == -1:
+            elif feature.location.strand == -1:
                 feature_dict[feature.type][f"{start} {stop}"]["strand"] = "-"
             else:
                 feature_dict[feature.type][f"{start} {stop}"]["strand"] = "NA"
@@ -279,8 +294,8 @@ def bed_to_dict(bed_file, coverage_df, ref, min_cov):
     for line in bed_line_list:
         start, stop = int(line[1]), int(line[2])
         bed_dict["bed annotations"][f"{start} {stop}"] = {}
-        bed_dict["bed annotations"][f"{start} {stop}"]["start"] = start
-        bed_dict["bed annotations"][f"{start} {stop}"]["stop"] = stop
+        bed_dict["bed annotations"][f"{start} {stop}"]["start"] = [start]
+        bed_dict["bed annotations"][f"{start} {stop}"]["stop"] = [stop]
         # always add strand dummy information in case its not in bed file
         bed_dict["bed annotations"][f"{start} {stop}"]["strand"] = "NA"
         # check for additional info
@@ -463,18 +478,19 @@ def annotate_vcf_df(vcf_df, cds_dict, seq):
             # check if a protein identifier is present
             if not any(identifier in potential_cds_identifiers for identifier in cds_dict[cds]):
                 continue
-            start, stop = cds_dict[cds]["start"], cds_dict[cds]["stop"]
-            # check if pos is in range
-            if variant[1]["position"] not in range(start, stop+1):
-                continue
-            # now we know the protein
-            for identifier in potential_cds_identifiers:
-                if identifier in cds_dict[cds]:
-                    proteins_temp.append(cds_dict[cds][identifier])
-                    break
-            # annotate mutations
-            amino_acid_mutations = get_mutations(start, stop, cds_dict[cds], variant[1], seq)
-            ac_exchange_temp.append(amino_acid_mutations[0]), ac_effect_temp.append(amino_acid_mutations[1])
+            # check parts of feature separately
+            for start, stop in zip(cds_dict[cds]["start"], cds_dict[cds]["stop"]):
+                # check if pos is in range
+                if variant[1]["position"] not in range(start, stop+1):
+                    continue
+                # now we know the protein
+                for identifier in potential_cds_identifiers:
+                    if identifier in cds_dict[cds]:
+                        proteins_temp.append(cds_dict[cds][identifier])
+                        break
+                # annotate mutations
+                amino_acid_mutations = get_mutations(start, stop, cds_dict[cds], variant[1], seq)
+                ac_exchange_temp.append(amino_acid_mutations[0]), ac_effect_temp.append(amino_acid_mutations[1])
         # check if we did not find a protein
         if not proteins_temp:
             proteins.append("NONE"), ac_exchange.append("NONE"), ac_effect.append("NONE")
@@ -490,6 +506,7 @@ def annotate_vcf_df(vcf_df, cds_dict, seq):
 
     # annotate and return df
     vcf_df["protein"], vcf_df["effect"], vcf_df["as mutation"] = proteins, ac_effect, ac_exchange
+
     return vcf_df
 
 
