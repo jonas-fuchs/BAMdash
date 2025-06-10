@@ -7,6 +7,7 @@ import statistics
 import sys
 
 import pandas as pd
+import numpy as np
 from collections import Counter
 # LIBS
 import plotly.graph_objects as go
@@ -52,8 +53,8 @@ def create_coverage_plot(fig, row, coverage_df, bin_size):
 
     # define hover template
     h_template = ""
-    for index, description in enumerate(["coverage", "percentage A", "percentage C", "percentage G", "percentage T"]):
-        h_template = h_template + f"<b>{description}: </b>%" + "{customdata" + f"[{index+1}" + "]}<br>"
+    for index, description in enumerate(["position", "coverage", "percentage A", "percentage C", "percentage G", "percentage T"]):
+        h_template = h_template + f"<b>{description}: </b>%" + "{customdata" + f"[{index}" + "]}<br>"
     h_template = h_template + "<extra></extra>"  # remove trace name
     # add dots with info
     fig.add_trace(
@@ -91,8 +92,6 @@ def create_coverage_plot(fig, row, coverage_df, bin_size):
         row=row,
         col=1
     )
-    # y axis title
-    fig.update_yaxes(range=[1, max(coverage_df["coverage"])], row=row, col=1)
 
 
 def split_vcf_df(df):
@@ -119,6 +118,45 @@ def split_vcf_df(df):
         return [df]
 
 
+def adjust_array_min_distance(values: list, min_distance: float, max_values, max_iterations: int = 100) -> list:
+    """
+    Adjust values in a 1D array to maintain a minimum distance while staying close to their original values.
+
+    :param values: List of values to adjust
+    :param min_distance: The required minimum distance between values.
+    :param max_values: boundaries
+    :param max_iterations: Maximum number of iterations for convergence.
+
+    :return: Adjusted values ensuring the minimum distance and minimal deviation.
+    """
+    values = np.array(values, dtype=float)
+    n = len(values)
+
+    # Sort indices to process values in their original order
+    sorted_indices = np.argsort(values)
+    original_values = values.copy()
+
+    for _ in range(max_iterations):
+        for i in range(1, n):
+            idx1, idx2 = sorted_indices[i - 1], sorted_indices[i]
+            if values[idx2] - values[idx1] < min_distance:
+                # Calculate the midpoint for adjustment
+                adjustment = (min_distance - (values[idx2] - values[idx1])) / 2
+                # Adjust values to separate while minimizing deviation
+                if values[idx1] - adjustment >= 0-max_values[0]/50:  # outside boundaries?
+                    values[idx1] -= adjustment
+                else:
+                    values[idx1] = 0 - max_values[0] / 100  # half way to boundary
+
+                if values[idx2] + adjustment <= max_values[1]:
+                    values[idx2] += adjustment
+                else:
+                    values[idx2] = max_values[1] + max_values[1] / 100
+
+
+    return values.tolist()
+
+
 def create_vcf_plot(fig, row, vcf_df):
     """
     :param fig: plotly fig
@@ -129,6 +167,59 @@ def create_vcf_plot(fig, row, vcf_df):
     # disable false positive slice warning
     pd.options.mode.chained_assignment = None
 
+    # draw stems from x value to jittered x value
+    # get max x-value to calculate min distance to jitter
+    for trace in fig['data']:
+        if 'x' in trace:
+            x_values = trace['x']
+            if x_values is not None:
+                max_x = max(x_values)
+
+    # adjust the min distance based on number of variant thresholds
+    for var_n, divider in zip([5, 25, 100, 500], [100, 25, 5, 1]):
+        if var_n < len(vcf_df["position"]):
+            continue
+        min_distance = max_x / len(vcf_df["position"]) / divider
+        break
+    # jitter vcf positions
+    vcf_df["position_jittered"] = adjust_array_min_distance(list(vcf_df["position"]), min_distance=min_distance, max_values=[0, max_x])
+
+    # add stem independent of upper layers
+    if "AF" in vcf_df:
+        y_data = vcf_df["AF"]
+    else:
+        y_data = [1] * len(vcf_df["position"])
+    # add lines
+    shapes = []
+    for x_value, x_value_jittered, y_value in zip(vcf_df["position"], vcf_df["position_jittered"], y_data):
+        for coordinates in [(x_value, -0.3, x_value, -0.15),
+                            (x_value, -0.15, x_value_jittered, 0),
+                            (x_value_jittered, 0, x_value_jittered, y_value-0.05)]:
+            shapes.append(
+                dict(
+                    type="line",
+                    xref=f"x{row}",
+                    yref=f"y{row}",
+                    x0=coordinates[0],
+                    y0=coordinates[1],
+                    x1=coordinates[2],
+                    y1=coordinates[3],
+                    line=dict(
+                        color=config.stem_color,
+                        width=config.stem_width
+                    ),
+                    layer='below'
+                )
+            )
+
+    # plot shape in each subplot
+    if fig["layout"]["shapes"]:
+        for shape in shapes:
+            fig.add_shape(shape)
+    else:
+        fig.update_layout(shapes=shapes)
+
+    # plot the respective jittered x values as scatter
     for mut, color in zip(["SNP", "INS", "DEL"], [config.snp_color, config.ins_color, config.del_color]):
         if mut not in list(vcf_df["type"]):
             continue
@@ -147,14 +238,15 @@ def create_vcf_plot(fig, row, vcf_df):
             h_template = ""
             for index, description in enumerate(list(vcf_subset.columns)):
                 # do not show position
-                if index == 0:
+                if index == len(vcf_subset.columns)-1:  # last one excludes the jittered data
                     continue
                 h_template = h_template + f"<b>{description}: </b>%" + "{customdata" + f"[{index}" + "]}<br>"
             h_template = h_template + "<extra></extra>"  # remove trace name
+
             # add trace
             fig.add_trace(
                 go.Scatter(
-                    x=vcf_subset["position"],
+                    x=vcf_subset["position_jittered"],
                     y=y_data,
                     name=f"plot {row}",
                     legendgroup=mut,
@@ -175,36 +267,21 @@ def create_vcf_plot(fig, row, vcf_df):
             row=row,
             col=1
             )
-    # add stem independent of upper layers
-    if "AF" in vcf_df:
-        y_data = vcf_df["AF"]
-    else:
-        y_data = [1] * len(vcf_df["position"])
-    # add lines
-    shapes = [dict(
-            type="line",
-            xref=f"x{row}",
-            yref=f"y{row}",
-            x0=x,
-            y0=0,
-            x1=x,
-            y1=y-0.05,
-            line=dict(
-                color=config.stem_color,
-                width=config.stem_width
-            )
-        ) for x, y in zip(vcf_df["position"], y_data)]
-    # plot shape in each subplot
-    if fig["layout"]["shapes"]:
-        for shape in shapes:
-            fig.add_shape(shape)
-    else:
-        fig.update_layout(shapes=shapes)
+
+    # update the y axis
+    fig.update_yaxes(
+        range=[-0.3, 1.15],
+        tickvals=[0, 0.5, 1],
+        ticktext=['0', '0.5', '1'],
+        col=1,
+        row=row
+    )
+
     # not need to show yaxis if af is not in vcf
     if "AF" not in vcf_df:
         fig.update_yaxes(visible=False, row=row, col=1)
     else:
-        fig.update_yaxes(title_text="frequency", range=[0, 1.15], row=row, col=1)
+        fig.update_yaxes(title_text="frequency", row=row, col=1)
 
 
 def create_track_plot(fig, row, feature_dict, box_size, box_alpha):

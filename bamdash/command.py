@@ -208,7 +208,7 @@ def main(sysargs=sys.argv[1:]):
     # global formatting
     fig.update_layout(
         template="plotly_white_custom",
-        hovermode="x unified",
+        hovermode="closest",
         font=dict(
             family=config.font,
             size=config.font_size,
@@ -256,12 +256,13 @@ def main(sysargs=sys.argv[1:]):
         linewidth=1,
         ticks="outside",
         minor_ticks="outside",
-        range=[0, max(coverage_df["position"])],
+        range=[0-max(coverage_df["position"])/50, max(coverage_df["position"])+max(coverage_df["position"])/50],
         showgrid=False,
     )
     # global y axis
     fig.update_yaxes(
         mirror=False,
+        zeroline=False,
         showline=True,
         linewidth=1,
         ticks="outside",
