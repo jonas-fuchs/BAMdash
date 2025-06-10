@@ -7,7 +7,6 @@ import statistics
 import sys
 
 import pandas as pd
-import numpy as np
 from collections import Counter
 # LIBS
 import plotly.graph_objects as go
@@ -129,16 +128,9 @@ def adjust_array_min_distance(values: list, min_distance: float, max_values, max
 
     :return: Adjusted values ensuring the minimum distance and minimal deviation.
     """
-    values = np.array(values, dtype=float)
-    n = len(values)
-
-    # Sort indices to process values in their original order
-    sorted_indices = np.argsort(values)
-    original_values = values.copy()
-
     for _ in range(max_iterations):
-        for i in range(1, n):
-            idx1, idx2 = sorted_indices[i - 1], sorted_indices[i]
+        for i in range(1, len(values)):
+            idx1, idx2 = i-1, i
             if values[idx2] - values[idx1] < min_distance:
                 # Calculate the midpoint for adjustment
                 adjustment = (min_distance - (values[idx2] - values[idx1])) / 2
@@ -154,7 +146,7 @@ def adjust_array_min_distance(values: list, min_distance: float, max_values, max
                     values[idx2] = max_values[1] + max_values[1] / 100
 
 
-    return values.tolist()
+    return values
 
 
 def create_vcf_plot(fig, row, vcf_df):
