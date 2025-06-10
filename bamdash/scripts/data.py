@@ -169,7 +169,7 @@ def vcf_to_df(vcf_file, ref):
     if empty_keys:
         [variant_dict.pop(key) for key in empty_keys]
 
-    return pd.DataFrame.from_dict(variant_dict)
+    return pd.DataFrame.from_dict(variant_dict).sort_values(by=["position"])
 
 
 def define_track_position(feature_dict):
