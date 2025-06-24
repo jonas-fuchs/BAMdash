@@ -169,7 +169,7 @@ def create_vcf_plot(fig, row, vcf_df):
 
     # adjust the min distance based on number of variant thresholds
     for var_n, divider in zip([5, 25, 100, 500], [100, 25, 5, 1]):
-        if var_n < len(vcf_df["position"]):
+        if var_n < len(vcf_df["position"]) and var_n != 500:
             continue
         min_distance = max_x / len(vcf_df["position"]) / divider
         break
@@ -186,7 +186,7 @@ def create_vcf_plot(fig, row, vcf_df):
     for x_value, x_value_jittered, y_value in zip(vcf_df["position"], vcf_df["position_jittered"], y_data):
         for coordinates in [(x_value, -0.3, x_value, -0.15),
                             (x_value, -0.15, x_value_jittered, 0),
-                            (x_value_jittered, 0, x_value_jittered, y_value-0.05)]:
+                            (x_value_jittered, 0, x_value_jittered, y_value)]:
             shapes.append(
                 dict(
                     type="line",
