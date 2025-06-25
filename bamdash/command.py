@@ -305,6 +305,7 @@ def main(sysargs=sys.argv[1:]):
         if track_data:
             for track in track_data:
                 if track[1] == "vcf":
+                    track[0] = track[0].drop(['position_jittered'], axis=1)  # do not report jittered position
                     track[0].to_csv(f"{args.reference}_vcf_data_{vcf_track_count}.tabular", sep="\t", header=True, index=False)
                     vcf_track_count += 1
                 elif track[1] == "bed":
