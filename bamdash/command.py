@@ -289,9 +289,7 @@ def main(sysargs=sys.argv[1:]):
     if args.export_static is not None:
         # static image specific options
         if config.show_log:  # correct log layout
-            fig["layout"]["yaxis"]["type"] = "log"
-            fig["layout"]["yaxis"]["range"] = (0, math.log(fig["layout"]["yaxis"]["range"][1], 10))
-            fig.update_yaxes(dtick=1, row=1)
+            fig.update_yaxes(type="log", dtick=1, row=1)
         fig.update_layout(updatemenus=[dict(visible=False)])  # no buttons
         fig.update_layout(annotations=[dict(visible=False)])  # no annotations
         # write static image

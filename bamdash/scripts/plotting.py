@@ -91,7 +91,6 @@ def create_coverage_plot(fig, row, coverage_df, bin_size):
         row=row,
         col=1
     )
-    fig.update_yaxes(range=[1, max(coverage_df["coverage"])], row=row, col=1)
 
 
 def split_vcf_df(df):
