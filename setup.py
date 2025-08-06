@@ -15,7 +15,7 @@ setup(
     license_files=('LICENSE'),
     packages=find_packages(),
     install_requires=[
-        "kaleido>=0.2.1",
+        "kaleido==0.2.*",
         "pandas>=1.4.4",
         "plotly>=5.17.0",
         "pysam>=0.21.0",

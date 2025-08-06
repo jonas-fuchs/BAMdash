@@ -12,6 +12,7 @@ import json
 import plotly.io as pio
 import pandas as pd
 from plotly.subplots import make_subplots
+import kaleido
 
 # BAMDASH
 from bamdash.scripts import data
@@ -293,7 +294,6 @@ def main(sysargs=sys.argv[1:]):
         fig.update_layout(updatemenus=[dict(visible=False)])  # no buttons
         fig.update_layout(annotations=[dict(visible=False)])  # no annotations
         # write static image
-        pio.kaleido.scope.mathjax = None  # fix so no weird box is shown
         fig.write_image(f"{args.reference}_plot.{args.export_static}", width=args.dimensions[0], height=args.dimensions[1])
 
     # dump track data
