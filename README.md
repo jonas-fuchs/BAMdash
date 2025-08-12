@@ -68,21 +68,12 @@ pip install bamdash
 ```shell
 conda install -c bioconda bamdash
 ```
-### from this repo:
+### For development:
 ```shell
 git clone https://github.com/jonas-fuchs/BAMdash
-cd BAMcov
-```
-and then install BAMdash with:
-```shell
-pip install -r requirements.txt
-```
-or:
-```shell
+cd BAMdash
 pip install .
 ```
-That was already it. To check if it worked:
-
 ```shell
 bamdash -v
 ```
@@ -117,7 +108,7 @@ full usage:
   -v, --version         show program's version number and exit
 ```
 
-## Test bamDASH
+## Test BAMdash
 
 - download the HEV example data:
 https://zenodo.org/api/records/10159816/files-archive 

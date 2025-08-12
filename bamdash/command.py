@@ -19,7 +19,6 @@ from bamdash.scripts import data
 from bamdash.scripts import plotting
 from bamdash.scripts import config
 from bamdash import __version__
-from . import _program
 
 
 def get_args(sysargs):
@@ -27,7 +26,6 @@ def get_args(sysargs):
     arg parsing for bamdash
     """
     parser = argparse.ArgumentParser(
-        prog=_program,
         usage='''\tbamdash -b "bam file path" -r "reference_id" [additional arguments]''')
     parser.add_argument(
         "-b",
