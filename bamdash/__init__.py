@@ -1,3 +1,6 @@
-"""interactively visualize coverage and tracks"""
-_program = "bamdash"
-__version__ = "0.4.4"
+from importlib.metadata import version, PackageNotFoundError
+
+try:
+    __version__ = version("bamdash")
+except PackageNotFoundError:
+    __version__ = "unknown"
