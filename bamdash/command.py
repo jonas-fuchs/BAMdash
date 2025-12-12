@@ -1,3 +1,4 @@
+# python
 """
 contains main workflow
 """
@@ -129,6 +130,7 @@ def main(sysargs=sys.argv[1:]):
 
     # define subplot number, track heights and parse data
     coverage_df, title, stat_dict = data.bam_to_coverage_df(args.bam, args.reference, args.coverage, args.quality_threshold)
+
     track_heights = [1]
     track_data = []
     # extract data and check if ref was found
@@ -204,6 +206,10 @@ def main(sysargs=sys.argv[1:]):
                     )
     )
 
+    # compute upper thresholds for y axis
+    upper = max(coverage_df["coverage"]+max(coverage_df["coverage"]/10))
+    log_upper = max(1, math.ceil(math.log10(upper)))
+
     # global formatting
     fig.update_layout(
         template="plotly_white_custom",
@@ -219,12 +225,12 @@ def main(sysargs=sys.argv[1:]):
                 direction="left",
                 buttons=[
                     dict(
-                        args=["yaxis.type", "linear"],
+                        args=[{"yaxis.type": "linear", "yaxis.range": [0, upper], "yaxis.autorange": False}],
                         label="linear",
                         method="relayout"
                     ),
                     dict(
-                        args=["yaxis.type", "log"],
+                        args=[{"yaxis.type": "log", "yaxis.range": [0, log_upper], "yaxis.autorange": False}],
                         label="log",
                         method="relayout"
                     ),
@@ -288,7 +294,7 @@ def main(sysargs=sys.argv[1:]):
     if args.export_static is not None:
         # static image specific options
         if config.show_log:  # correct log layout
-            fig.update_yaxes(type="log", dtick=1, row=1)
+            fig.update_yaxes(type="log", dtick=1, row=1, range=[0, log_upper], autorange=False)
         fig.update_layout(updatemenus=[dict(visible=False)])  # no buttons
         fig.update_layout(annotations=[dict(visible=False)])  # no annotations
         # write static image
