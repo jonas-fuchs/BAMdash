@@ -12,6 +12,7 @@ import json
 # LIBS
 import plotly.io as pio
 import pandas as pd
+import pysam
 from plotly.subplots import make_subplots
 import kaleido
 
@@ -27,7 +28,7 @@ def get_args(sysargs):
     arg parsing for bamdash
     """
     parser = argparse.ArgumentParser(
-        usage='''\tbamdash -b "bam file path" -r "reference_id" [additional arguments]''')
+        usage='''\tbamdash -b "bam file path" [additional arguments]''')
     parser.add_argument(
         "-b",
         "--bam",
@@ -38,11 +39,29 @@ def get_args(sysargs):
     )
     parser.add_argument(
         "-r",
-        "--reference",
-        required=True,
+        "--ref-id",
+        required=False,
+        default=None,
         type=str,
         metavar=" ",
-        help="seq reference id"
+        help="seq reference id (default: first reference in bam)"
+    )
+    parser.add_argument(
+        "-p",
+        "--prefix",
+        type=str,
+        default="./plot",
+        metavar="./plot",
+        help="path and partial filename for output files"
+    )
+    parser.add_argument(
+        "-s",
+        "--suffix",
+        type=str,
+        nargs="*",
+        default=["html"],
+        metavar="html",
+        help="output file extensions appended to prefix (e.g. html png pdf svg)"
     )
     parser.add_argument(
         "-q",
@@ -68,7 +87,7 @@ def get_args(sysargs):
         type=str,
         metavar="track_1",
         nargs="*",
-        help="file location of tracks"
+        help="file location of tracks (accepted: *.vcf, *.bed, *.gb)"
     )
     parser.add_argument(
         "-c",
@@ -83,14 +102,6 @@ def get_args(sysargs):
         action=argparse.BooleanOptionalAction,
         default=False,
         help="show slider"
-    )
-    parser.add_argument(
-        "-e",
-        "--export_static",
-        type=str,
-        metavar="None",
-        default=None,
-        help="export as png, jpg, pdf, svg"
     )
     parser.add_argument(
         "-d",
@@ -118,7 +129,11 @@ def get_args(sysargs):
         parser.print_help()
         sys.exit(-1)
     else:
-        return parser.parse_args(sysargs)
+        args = parser.parse_args(sysargs)
+    # a bare "-s" with no values is almost certainly a mistake
+    if not args.suffix:
+        parser.error("the following arguments are required: at least one --suffix / -s value")
+    return args
 
 
 def main(sysargs=sys.argv[1:]):
@@ -128,8 +143,14 @@ def main(sysargs=sys.argv[1:]):
     # parse args
     args = get_args(sysargs)
 
+    # resolve ref id: fall back to the first reference in the bam header
+    if args.ref_id is None:
+        with pysam.AlignmentFile(args.bam, "rb") as bam:
+            args.ref_id = bam.references[0]
+        print(f"INFO: no ref-id given, using '{args.ref_id}'")
+
     # define subplot number, track heights and parse data
-    coverage_df, title, stat_dict = data.bam_to_coverage_df(args.bam, args.reference, args.coverage, args.quality_threshold)
+    coverage_df, title, stat_dict = data.bam_to_coverage_df(args.bam, args.ref_id, args.coverage, args.quality_threshold)
 
     track_heights = [1]
     track_data = []
@@ -138,7 +159,7 @@ def main(sysargs=sys.argv[1:]):
         number_of_tracks = len(args.tracks)+1
         for track in args.tracks:
             if track.endswith("vcf"):
-                vcf_data = [data.vcf_to_df(track, args.reference), "vcf"]
+                vcf_data = [data.vcf_to_df(track, args.ref_id), "vcf"]
                 if vcf_data[0].empty:
                     print("WARNING: vcf data does not contain the seq reference id")
                     number_of_tracks -= 1
@@ -146,7 +167,7 @@ def main(sysargs=sys.argv[1:]):
                     track_heights = track_heights + [config.vcf_track_proportion]
                     track_data.append(vcf_data)
             elif track.endswith("gb"):
-                gb_dict, seq = data.genbank_to_dict(track, coverage_df, args.reference, args.coverage)
+                gb_dict, seq = data.genbank_to_dict(track, coverage_df, args.ref_id, args.coverage)
                 if gb_dict:
                     track_heights = track_heights + [config.gb_track_proportion]
                     track_data.append([gb_dict, "gb", seq])
@@ -154,7 +175,7 @@ def main(sysargs=sys.argv[1:]):
                     print("WARNING: gb data does not contain the seq reference id")
                     number_of_tracks -= 1
             elif track.endswith("bed"):
-                bed_data = [data.bed_to_dict(track, coverage_df, args.reference, args.coverage), "bed"]
+                bed_data = [data.bed_to_dict(track, coverage_df, args.ref_id, args.coverage), "bed"]
                 if bed_data[0]["bed annotations"]:
                     track_heights = track_heights + [config.bed_track_proportion]
                     track_data.append(bed_data)
@@ -162,7 +183,7 @@ def main(sysargs=sys.argv[1:]):
                     print("WARNING: bed data does not contain the seq reference id")
                     number_of_tracks -= 1
             else:
-                sys.exit("one of the track types is not supported (supported are *.vcf, *.bed and *.gb")
+                sys.exit("one of the track types is not supported (supported are *.vcf, *.bed and *.gb)")
     else:
         number_of_tracks = 1
 
@@ -288,34 +309,37 @@ def main(sysargs=sys.argv[1:]):
     else:
         # last x axis
         fig.update_xaxes(title_text="genome position", row=number_of_tracks, col=1)
-    # html export
-    fig.write_html(f"{args.reference}_plot.html")
-    # static image export
-    if args.export_static is not None:
-        # static image specific options
-        if config.show_log:  # correct log layout
-            fig.update_yaxes(type="log", dtick=1, row=1, range=[0, log_upper], autorange=False)
-        fig.update_layout(updatemenus=[dict(visible=False)])  # no buttons
-        fig.update_layout(annotations=[dict(visible=False)])  # no annotations
-        # write static image
-        fig.write_image(f"{args.reference}_plot.{args.export_static}", width=args.dimensions[0], height=args.dimensions[1])
+    # export one file per requested suffix
+    static_prepared = False
+    for suffix in args.suffix:
+        if suffix == "html":
+            fig.write_html(f"{args.prefix}.html")
+        else:
+            # apply static-image layout cleanup once before the first static export
+            if not static_prepared:
+                if config.show_log:  # correct log layout
+                    fig.update_yaxes(type="log", dtick=1, row=1, range=[0, log_upper], autorange=False)
+                fig.update_layout(updatemenus=[dict(visible=False)])  # no buttons
+                fig.update_layout(annotations=[dict(visible=False)])  # no annotations
+                static_prepared = True
+            fig.write_image(f"{args.prefix}.{suffix}", width=args.dimensions[0], height=args.dimensions[1])
 
     # dump track data
     vcf_track_count, bed_track_count, gb_track_count = 0, 0, 0
     if args.dump:
-        pd.DataFrame.from_dict(stat_dict, orient="index").to_csv(f"{args.reference}_bam_stats.tabular", sep="\t", header=False, index=True)
+        pd.DataFrame.from_dict(stat_dict, orient="index").to_csv(f"{args.prefix}_bam_stats.tabular", sep="\t", header=False, index=True)
         if track_data:
             for track in track_data:
                 if track[1] == "vcf":
                     track[0] = track[0].drop(['position_jittered'], axis=1)  # do not report jittered position
-                    track[0].to_csv(f"{args.reference}_vcf_data_{vcf_track_count}.tabular", sep="\t", header=True, index=False)
+                    track[0].to_csv(f"{args.prefix}_vcf_data_{vcf_track_count}.tabular", sep="\t", header=True, index=False)
                     vcf_track_count += 1
                 elif track[1] == "bed":
                     bed_df = pd.DataFrame.from_dict(track[0]["bed annotations"], orient="index")
                     bed_df.drop("track", axis=1, inplace=True)
-                    bed_df.to_csv(f"{args.reference}_bed_data_{bed_track_count}.tabular", sep="\t", header=True, index=False)
+                    bed_df.to_csv(f"{args.prefix}_bed_data_{bed_track_count}.tabular", sep="\t", header=True, index=False)
                     bed_track_count += 1
                 elif track[1] == "gb":
-                    with open(f"{args.reference}_gb_data_{gb_track_count}.json", "w") as fp:
+                    with open(f"{args.prefix}_gb_data_{gb_track_count}.json", "w") as fp:
                         json.dump(track[0], fp)
                     gb_track_count += 1

@@ -4,3 +4,5 @@ test/**
 build/**
 bamdash.egg-info/**
 venv/**
+bamdash/__pycache__/**
+bamdash/scripts/__pycache__/**

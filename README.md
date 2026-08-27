@@ -84,14 +84,18 @@ You should see the current BAMdash version.
 ```shell
 usage: 	
 
-bamdash -b bam_file_path -r reference_id [additional arguments]
+bamdash -b bam_file_path [additional arguments]
 ```
 ```
 full usage:
 
   -h, --help            show this help message and exit
   -b  , --bam           bam file location
-  -r  , --reference     seq reference id
+  -r  , --ref-id        seq reference id (default: first reference in bam)
+  -p ./plot, --prefix ./plot
+                        path and partial filename for output files
+  -s [html ...], --suffix [html ...]
+                        output file extensions appended to prefix (e.g. html png pdf svg)
   -q 15, --quality-threshold 15
                         qaulity threshold for reads
   -bs  , --binsize      bins for the coverage plot
@@ -100,8 +104,6 @@ full usage:
   -c 5, --coverage 5    minimum coverage
   --slider, --no-slider
                         show slider (default: False)
-  -e None, --export_static None
-                        export as png, jpg, pdf, svg
   -d px px, --dimensions px px
                         width and height of the static image in px
   --dump, --no-dump     dump annotated track data (default: False)
