@@ -5,14 +5,17 @@ contains defs for plotting
 # BUILT-INS
 import statistics
 import sys
+import logging
+from collections import Counter
 
 import pandas as pd
-from collections import Counter
 # LIBS
 import plotly.graph_objects as go
 import plotly.express as px
 # BAMDASH
 from bamdash.scripts import config
+
+logger = logging.getLogger("bamdash")
 
 
 def create_coverage_plot(fig, row, coverage_df, bin_size):
@@ -48,7 +51,8 @@ def create_coverage_plot(fig, row, coverage_df, bin_size):
     elif bin_size == 1:
         coverage_df_plot = coverage_df
     else:
-        sys.exit("ERROR: bin size below 1 is not valid")
+        logger.error("bin size below 1 is not valid")
+        sys.exit(1)
 
     # define hover template
     h_template = ""

@@ -6,6 +6,7 @@ contains main workflow
 # BUILT-INS
 import sys
 import argparse
+import logging
 import math
 import json
 
@@ -21,6 +22,8 @@ from bamdash.scripts import data
 from bamdash.scripts import plotting
 from bamdash.scripts import config
 from bamdash import __version__
+
+logger = logging.getLogger("bamdash")
 
 
 def get_args(sysargs):
@@ -120,6 +123,12 @@ def get_args(sysargs):
         help="dump annotated track data; filenames derive from --prefix"
     )
     parser.add_argument(
+        "--verbose",
+        action="count",
+        default=0,
+        help="increase logging verbosity: --verbose for INFO, --verbose --verbose for DEBUG"
+    )
+    parser.add_argument(
         "-v",
         "--version",
         action='version',
@@ -130,6 +139,10 @@ def get_args(sysargs):
         sys.exit(-1)
     else:
         args = parser.parse_args(sysargs)
+    # configure logging early so warnings emitted below are formatted
+    # default WARNING, --verbose -> INFO, --verbose --verbose -> DEBUG
+    level = logging.WARNING - 10 * min(args.verbose, 2)
+    logging.basicConfig(level=level, format="%(levelname)s: %(message)s")
     # a bare "-s" with no values is almost certainly a mistake
     if not args.suffix:
         parser.error("the following arguments are required: at least one --suffix / -s value")
@@ -144,8 +157,7 @@ def get_args(sysargs):
     # --dimensions only affects static (non-html) output
     static_suffixes = [s for s in args.suffix if s != "html"]
     if args.dimensions is not None and not static_suffixes:
-        print("WARNING: --dimensions has no effect when no static (non-html) suffix is requested",
-              file=sys.stderr)
+        logger.warning("--dimensions has no effect when no static (non-html) suffix is requested")
     if args.dimensions is None:
         args.dimensions = [1920, 1080]
     return args
@@ -162,7 +174,7 @@ def main(sysargs=sys.argv[1:]):
     if args.ref_id is None:
         with pysam.AlignmentFile(args.bam, "rb") as bam:
             args.ref_id = bam.references[0]
-        print(f"INFO: no ref-id given, using '{args.ref_id}'")
+        logger.info("no ref-id given, using '%s'", args.ref_id)
 
     # define subplot number, track heights and parse data
     coverage_df, title, stat_dict = data.bam_to_coverage_df(args.bam, args.ref_id, args.coverage, args.quality_threshold)
@@ -176,7 +188,7 @@ def main(sysargs=sys.argv[1:]):
             if track.endswith("vcf"):
                 vcf_data = [data.vcf_to_df(track, args.ref_id), "vcf"]
                 if vcf_data[0].empty:
-                    print("WARNING: vcf data does not contain the seq reference id")
+                    logger.warning("vcf data does not contain the seq reference id")
                     number_of_tracks -= 1
                 else:
                     track_heights = track_heights + [config.vcf_track_proportion]
@@ -187,7 +199,7 @@ def main(sysargs=sys.argv[1:]):
                     track_heights = track_heights + [config.gb_track_proportion]
                     track_data.append([gb_dict, "gb", seq])
                 else:
-                    print("WARNING: gb data does not contain the seq reference id")
+                    logger.warning("gb data does not contain the seq reference id")
                     number_of_tracks -= 1
             elif track.endswith("bed"):
                 bed_data = [data.bed_to_dict(track, coverage_df, args.ref_id, args.coverage), "bed"]
@@ -195,10 +207,11 @@ def main(sysargs=sys.argv[1:]):
                     track_heights = track_heights + [config.bed_track_proportion]
                     track_data.append(bed_data)
                 else:
-                    print("WARNING: bed data does not contain the seq reference id")
+                    logger.warning("bed data does not contain the seq reference id")
                     number_of_tracks -= 1
             else:
-                sys.exit("one of the track types is not supported (supported are *.vcf, *.bed and *.gb)")
+                logger.error("one of the track types is not supported (supported are *.vcf, *.bed and *.gb")
+                sys.exit(1)
     else:
         number_of_tracks = 1
 

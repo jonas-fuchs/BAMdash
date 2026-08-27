@@ -4,6 +4,7 @@ contains defs for data analysis
 # BUILT INS
 import math
 import sys
+import logging
 
 # LIBS
 import pandas as pd
@@ -11,6 +12,8 @@ from Bio import Seq
 from Bio import SeqIO
 import pysam
 from pysam import VariantFile
+
+logger = logging.getLogger("bamdash")
 
 
 def make_stat_substring(stat_string, name, value):
@@ -83,7 +86,9 @@ def bam_to_coverage_df(bam_file, ref, min_cov, quality_thres):
     bam = pysam.AlignmentFile(bam_file, "rb")
 
     if ref not in bam.references:
-        sys.exit(f'WARNING: ref id does not exist in bam file. Available references are {bam.references}')
+        logger.error("ref id '%s' does not exist in bam file. Available references are %s",
+                     ref, bam.references)
+        sys.exit(1)
 
     coverage, position = [], []
     # count coverage at each pos
@@ -220,7 +225,7 @@ def genbank_to_dict(gb_file, coverage_df, ref, min_cov):
 
     for gb_record in SeqIO.parse(open(gb_file, "r"), "genbank"):
         if gb_record.id != ref and gb_record.name != ref:
-            print('WARNING: ref id does not match genbank')
+            logger.warning("ref id does not match genbank")
             break
         seq = gb_record.seq
         for feature in gb_record.features:
@@ -528,7 +533,7 @@ def annotate_vcfs_in_tracks(track_data):
         # and only one gb file
         gb_indices = index_positions[0]
         if len(gb_indices) > 1:
-            print("WARNING: cannot annotate from multiple *.gb files!")
+            logger.warning("cannot annotate from multiple *.gb files!")
             return track_data
             # annotate each vcf df
         for vcf_track in index_positions[1]:

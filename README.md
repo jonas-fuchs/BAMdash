@@ -112,6 +112,8 @@ full usage:
                         requested)
   --dump, --no-dump     dump annotated track data; filenames derive from
                         --prefix (default: False)
+  --verbose             increase logging verbosity: --verbose for INFO,
+                        --verbose --verbose for DEBUG
   -v, --version         show program's version number and exit
 ```
 
