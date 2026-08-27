@@ -34,7 +34,7 @@ def get_args(sysargs):
         "--bam",
         required=True,
         type=str,
-        metavar=" ",
+        metavar="BAM",
         help="bam file location"
     )
     parser.add_argument(
@@ -43,7 +43,7 @@ def get_args(sysargs):
         required=False,
         default=None,
         type=str,
-        metavar=" ",
+        metavar="REF_ID",
         help="seq reference id (default: first reference in bam)"
     )
     parser.add_argument(
@@ -61,7 +61,8 @@ def get_args(sysargs):
         nargs="*",
         default=["html"],
         metavar="html",
-        help="output file extensions appended to prefix (e.g. html png pdf svg)"
+        help="output file extensions appended to prefix "
+             "(allowed: html, png, jpg, jpeg, webp, svg, pdf, eps)"
     )
     parser.add_argument(
         "-q",
@@ -69,21 +70,20 @@ def get_args(sysargs):
         type=int,
         default=15,
         metavar="15",
-        help="qaulity threshold for reads"
+        help="quality threshold for reads"
     )
     parser.add_argument(
         "-bs",
         "--binsize",
         default=1,
         type=int,
-        metavar=" ",
+        metavar="N",
         help="bins for the coverage plot"
     )
     parser.add_argument(
         "-t",
         "--tracks",
         default=None,
-        action="store",
         type=str,
         metavar="track_1",
         nargs="*",
@@ -108,16 +108,16 @@ def get_args(sysargs):
         "--dimensions",
         type=int,
         metavar="px",
-        action="store",
-        default=[1920, 1080],
+        default=None,
         nargs=2,
-        help="width and height of the static image in px"
+        help="width and height of static (non-html) output in px "
+             "(default: 1920 1080; ignored when only html is requested)"
     )
     parser.add_argument(
         "--dump",
         action=argparse.BooleanOptionalAction,
         default=False,
-        help="dump annotated track data"
+        help="dump annotated track data; filenames derive from --prefix"
     )
     parser.add_argument(
         "-v",
@@ -133,6 +133,21 @@ def get_args(sysargs):
     # a bare "-s" with no values is almost certainly a mistake
     if not args.suffix:
         parser.error("the following arguments are required: at least one --suffix / -s value")
+    # drop duplicate suffixes while preserving order
+    args.suffix = list(dict.fromkeys(args.suffix))
+    # validate suffixes against the supported set
+    allowed_suffixes = {"html", "png", "jpg", "jpeg", "webp", "svg", "pdf", "eps"}
+    bad = [s for s in args.suffix if s not in allowed_suffixes]
+    if bad:
+        parser.error(f"unsupported --suffix value(s): {', '.join(bad)} "
+                     f"(allowed: {', '.join(sorted(allowed_suffixes))})")
+    # --dimensions only affects static (non-html) output
+    static_suffixes = [s for s in args.suffix if s != "html"]
+    if args.dimensions is not None and not static_suffixes:
+        print("WARNING: --dimensions has no effect when no static (non-html) suffix is requested",
+              file=sys.stderr)
+    if args.dimensions is None:
+        args.dimensions = [1920, 1080]
     return args
 
 

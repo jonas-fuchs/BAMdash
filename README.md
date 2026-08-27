@@ -90,23 +90,28 @@ bamdash -b bam_file_path [additional arguments]
 full usage:
 
   -h, --help            show this help message and exit
-  -b  , --bam           bam file location
-  -r  , --ref-id        seq reference id (default: first reference in bam)
+  -b BAM, --bam BAM     bam file location
+  -r REF_ID, --ref-id REF_ID
+                        seq reference id (default: first reference in bam)
   -p ./plot, --prefix ./plot
                         path and partial filename for output files
   -s [html ...], --suffix [html ...]
-                        output file extensions appended to prefix (e.g. html png pdf svg)
+                        output file extensions appended to prefix (allowed:
+                        html, png, jpg, jpeg, webp, svg, pdf, eps)
   -q 15, --quality-threshold 15
-                        qaulity threshold for reads
-  -bs  , --binsize      bins for the coverage plot
+                        quality threshold for reads
+  -bs N, --binsize N    bins for the coverage plot
   -t [track_1 ...], --tracks [track_1 ...]
-                        file location of tracks
+                        file location of tracks (accepted: *.vcf, *.bed, *.gb)
   -c 5, --coverage 5    minimum coverage
   --slider, --no-slider
                         show slider (default: False)
   -d px px, --dimensions px px
-                        width and height of the static image in px
-  --dump, --no-dump     dump annotated track data (default: False)
+                        width and height of static (non-html) output in px
+                        (default: 1920 1080; ignored when only html is
+                        requested)
+  --dump, --no-dump     dump annotated track data; filenames derive from
+                        --prefix (default: False)
   -v, --version         show program's version number and exit
 ```
 
