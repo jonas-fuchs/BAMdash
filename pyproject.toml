@@ -41,3 +41,7 @@ bamdash = ["scripts/templates/*.html", "scripts/config.toml"]
 testpaths = ["tests"]
 strict_markers = true
 addopts = "-ra"
+# Make the project root importable so test modules can do
+# `from tests.conftest import ...` even in fresh CI checkouts where the
+# rootdir is not on sys.path by default (pytest >=7 supports `pythonpath`).
+pythonpath = ["."]
