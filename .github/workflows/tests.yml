@@ -79,6 +79,11 @@ jobs:
               if not m:
                   raise SystemExit(f"could not parse lower bound: {dep!r}")
               pins.append(f"{m.group(1)}=={m.group(2)}")
+          # The oldest pandas floor (1.5.3) was built against numpy 1.x and is
+          # ABI-incompatible with numpy 2.x ("numpy.dtype size changed").
+          # Capping numpy<2 only affects this min-deps job; the max-deps job
+          # installs latest pandas (2.x), which is numpy-2 compatible.
+          pins.append("numpy<2")
           Path('min-constraints.txt').write_text("\n".join(pins) + "\n")
           print("\n".join(pins))
 
