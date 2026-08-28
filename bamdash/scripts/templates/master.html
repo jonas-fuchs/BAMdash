@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>$title</title>
+<script>$plotly_js</script>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    font-family: Arial, sans-serif;
+    background: #fff;
+  }
+  body {
+    display: flex;
+    flex-direction: column;
+  }
+  .bamdash-controls {
+    flex: 0 0 auto;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .bamdash-controls label {
+    font-weight: bold;
+    font-size: 16px;
+  }
+  .bamdash-controls select {
+    font-size: 16px;
+    padding: 4px 8px;
+  }
+  /* Match the toggle button height to the dropdown so the two controls
+     sit on the same baseline. */
+  .bamdash-controls button {
+    font-size: 16px;
+    padding: 4px 12px;
+    line-height: 1.2;
+    border: 1px solid #888;
+    background: #fff;
+    cursor: pointer;
+    border-radius: 0;
+  }
+  /* The panels container fills the remaining viewport. Each panel is
+     absolutely positioned to fill it, so every reference's figure resolves
+     its 100% width/height against the same box regardless of which is
+     visible. This keeps the figure size consistent across the dropdown. */
+  #bamdash-panels {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  .ref-panel {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 0 16px 16px 16px;
+    /* Use visibility instead of display:none so hidden panels still occupy
+       the full panel box. Plotly then sizes every figure at full panel
+       dimensions from the start, so switching references is an instant
+       visibility toggle with no resize flash. */
+    visibility: hidden;
+  }
+  .ref-panel.active {
+    visibility: visible;
+  }
+  /* to_html() wraps the graph in a bare <div>; make that wrapper (and the
+     plotly graph div / plot container chain) fill the panel so the figure
+     resolves its 100% height against the full panel rather than collapsing
+     to plotly's default 450px. */
+  .ref-panel > div,
+  .ref-panel .plotly-graph-div,
+  .ref-panel .plot-container.plotly {
+    height: 100%;
+    width: 100%;
+  }
+</style>
+</head>
+<body>
+<div class="bamdash-controls">
+  <label for="bamdash-ref-select">Reference:</label>
+  <select id="bamdash-ref-select">
+$dropdown_options
+  </select>
+  <button id="bamdash-scale-toggle" type="button" aria-pressed="false">log</button>
+</div>
+<div id="bamdash-panels">
+$panels
+</div>
+<script>
+// per-reference linear/log y-axis ranges, injected by html.build_master_html
+var bamdashAxisRanges = $axis_ranges;
+(function () {
+  var select = document.getElementById("bamdash-ref-select");
+  var panels = document.querySelectorAll(".ref-panel");
+  var scaleToggle = document.getElementById("bamdash-scale-toggle");
+
+  function showPanel(refId) {
+    panels.forEach(function (p) {
+      if (p.id === "plot-" + refId) {
+        p.classList.add("active");
+      } else {
+        p.classList.remove("active");
+      }
+    });
+  }
+
+  // Apply a linear or log y-axis to EVERY subfigure at once. Each reference
+  // has its own coverage maximum, so the range is looked up per panel from
+  // bamdashAxisRanges. The toggle button label reflects the mode you will
+  // switch TO (shows "log" while linear is active and vice versa).
+  function applyScale(mode) {
+    panels.forEach(function (p) {
+      var gd = p.querySelector(".plotly-graph-div");
+      if (!gd || !window.Plotly) { return; }
+      var safeId = p.id.replace(/^plot-/, "");
+      var ranges = bamdashAxisRanges[safeId];
+      if (!ranges) { return; }
+      var range = ranges[mode];
+      window.Plotly.relayout(gd, {
+        "yaxis.type": mode,
+        "yaxis.range": range,
+        "yaxis.autorange": false
+      });
+    });
+  }
+
+  select.addEventListener("change", function () {
+    showPanel(select.value);
+  });
+
+  // global log/linear toggle: applies to all subfigures
+  scaleToggle.addEventListener("click", function () {
+    var pressed = scaleToggle.getAttribute("aria-pressed") === "true";
+    var nextMode = pressed ? "linear" : "log";
+    applyScale(nextMode);
+    scaleToggle.setAttribute("aria-pressed", String(!pressed));
+    scaleToggle.textContent = pressed ? "log" : "linear";
+  });
+
+  // show the first reference on load
+  showPanel(select.value);
+  // keep the active figure sized on window resize
+  window.addEventListener("resize", function () {
+    var active = document.querySelector(".ref-panel.active .plotly-graph-div");
+    if (active && window.Plotly) {
+      window.Plotly.Plots.resize(active);
+    }
+  });
+})();
+</script>
+</body>
+</html>

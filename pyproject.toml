@@ -32,3 +32,6 @@ include-package-data = true
 where = ["."]
 include = ['bamdash*']
 namespaces = false
+
+[tool.setuptools.package-data]
+bamdash = ["scripts/templates/*.html"]

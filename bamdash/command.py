@@ -6,20 +6,18 @@ contains main workflow
 # BUILT-INS
 import sys
 import argparse
+import copy
 import logging
-import math
 import json
 
 # LIBS
-import plotly.io as pio
 import pandas as pd
 import pysam
-from plotly.subplots import make_subplots
-import kaleido
 
 # BAMDASH
 from bamdash.scripts import data
 from bamdash.scripts import plotting
+from bamdash.scripts import html as html_mod
 from bamdash.scripts import config
 from bamdash import __version__
 
@@ -46,8 +44,9 @@ def get_args(sysargs):
         required=False,
         default=None,
         type=str,
+        nargs="*",
         metavar="REF_ID",
-        help="seq reference id (default: first reference in bam)"
+        help="seq reference id(s); default: all references in bam"
     )
     parser.add_argument(
         "-p",
@@ -65,7 +64,7 @@ def get_args(sysargs):
         default=["html"],
         metavar="html",
         help="output file extensions appended to prefix "
-             "(allowed: html, png, jpg, jpeg, webp, svg, pdf, eps)"
+             "(allowed: html, png, jpg, jpeg, webp, svg, pdf, eps), multiple values allowed, default: html"
     )
     parser.add_argument(
         "-q",
@@ -73,7 +72,7 @@ def get_args(sysargs):
         type=int,
         default=15,
         metavar="15",
-        help="quality threshold for reads"
+        help="quality threshold for reads (default: 15)"
     )
     parser.add_argument(
         "-bs",
@@ -81,7 +80,7 @@ def get_args(sysargs):
         default=1,
         type=int,
         metavar="N",
-        help="bins for the coverage plot"
+        help="bins the coverage data into N bp bins (default: 1, no binning)"
     )
     parser.add_argument(
         "-t",
@@ -90,7 +89,7 @@ def get_args(sysargs):
         type=str,
         metavar="track_1",
         nargs="*",
-        help="file location of tracks (accepted: *.vcf, *.bed, *.gb)"
+        help="file location of tracks (accepted: *.vcf, *.bed, *.gb, multiple paths to files allowed)"
     )
     parser.add_argument(
         "-c",
@@ -120,7 +119,7 @@ def get_args(sysargs):
         "--dump",
         action=argparse.BooleanOptionalAction,
         default=False,
-        help="dump annotated track data; filenames derive from --prefix"
+        help="dump annotated track data; filenames derive from --prefix (default: no dump)"
     )
     parser.add_argument(
         "--verbose",
@@ -163,51 +162,47 @@ def get_args(sysargs):
     return args
 
 
-def main(sysargs=sys.argv[1:]):
+def _load_reference(args, ref):
     """
-    main function for data extraction and plotting
+    Load coverage and track data for a single reference and build its figure.
+
+    :param args: parsed CLI args
+    :param ref: reference id
+    :return: ``(ref_fig, upper, log_upper, track_data, stat_dict, number_of_tracks)``
+        or ``None`` if the reference has no usable data (e.g. zero-length)
     """
-    # parse args
-    args = get_args(sysargs)
-
-    # resolve ref id: fall back to the first reference in the bam header
-    if args.ref_id is None:
-        with pysam.AlignmentFile(args.bam, "rb") as bam:
-            args.ref_id = bam.references[0]
-        logger.info("no ref-id given, using '%s'", args.ref_id)
-
-    # define subplot number, track heights and parse data
-    coverage_df, title, stat_dict = data.bam_to_coverage_df(args.bam, args.ref_id, args.coverage, args.quality_threshold)
+    # coverage is required for every reference; a missing ref raises ReferenceNotFoundError
+    coverage_df, title, stat_dict = data.bam_to_coverage_df(
+        args.bam, ref, args.coverage, args.quality_threshold)
 
     track_heights = [1]
     track_data = []
-    # extract data and check if ref was found
     if args.tracks is not None:
-        number_of_tracks = len(args.tracks)+1
+        number_of_tracks = len(args.tracks) + 1
         for track in args.tracks:
             if track.endswith("vcf"):
-                vcf_data = [data.vcf_to_df(track, args.ref_id), "vcf"]
+                vcf_data = [data.vcf_to_df(track, ref), "vcf"]
                 if vcf_data[0].empty:
-                    logger.warning("vcf data does not contain the seq reference id")
+                    logger.warning("vcf data does not contain the seq reference id '%s'", ref)
                     number_of_tracks -= 1
                 else:
                     track_heights = track_heights + [config.vcf_track_proportion]
                     track_data.append(vcf_data)
             elif track.endswith("gb"):
-                gb_dict, seq = data.genbank_to_dict(track, coverage_df, args.ref_id, args.coverage)
+                gb_dict, seq = data.genbank_to_dict(track, coverage_df, ref, args.coverage)
                 if gb_dict:
                     track_heights = track_heights + [config.gb_track_proportion]
                     track_data.append([gb_dict, "gb", seq])
                 else:
-                    logger.warning("gb data does not contain the seq reference id")
+                    logger.warning("gb data does not contain the seq reference id '%s'", ref)
                     number_of_tracks -= 1
             elif track.endswith("bed"):
-                bed_data = [data.bed_to_dict(track, coverage_df, args.ref_id, args.coverage), "bed"]
+                bed_data = [data.bed_to_dict(track, coverage_df, ref, args.coverage), "bed"]
                 if bed_data[0]["bed annotations"]:
                     track_heights = track_heights + [config.bed_track_proportion]
                     track_data.append(bed_data)
                 else:
-                    logger.warning("bed data does not contain the seq reference id")
+                    logger.warning("bed data does not contain the seq reference id '%s'", ref)
                     number_of_tracks -= 1
             else:
                 logger.error("one of the track types is not supported (supported are *.vcf, *.bed and *.gb")
@@ -218,156 +213,118 @@ def main(sysargs=sys.argv[1:]):
     # annotate if one gb and vcfs are in tracks
     track_data = data.annotate_vcfs_in_tracks(track_data)
 
-    # define layout
-    fig = make_subplots(
-        rows=number_of_tracks,
-        cols=1,
-        shared_xaxes=True,
-        row_heights=track_heights,
-        vertical_spacing=config.plot_spacing,
-    )
-    # create coverage plot
-    plotting.create_coverage_plot(fig, 1, coverage_df, args.binsize)
-    # create track plots
-    if track_data:
-        for index, track in enumerate(track_data):
-            row = index+2
-            if track[1] == "vcf":
-                plotting.create_vcf_plot(fig, row, track[0])
-            elif track[1] == "gb":
-                plotting.create_track_plot(fig, row, track[0], config.box_gb_size, config.box_gb_alpha)
-            elif track[1] == "bed":
-                plotting.create_track_plot(fig, row, track[0], config.box_bed_size, config.box_bed_alpha)
+    fig, upper, log_upper = plotting.build_figure(
+        ref, coverage_df, track_data, number_of_tracks, track_heights, title, args)
 
-    # define own templates
-    pio.templates["plotly_dark_custom"], pio.templates["plotly_white_custom"] = pio.templates["plotly_dark"], pio.templates["plotly_white"]
-    # change params
-    pio.templates["plotly_dark_custom"].update(
-        layout=dict(yaxis=dict(linecolor="white", tickcolor="white", zerolinecolor="rgb(17,17,17)"),
-                    xaxis=dict(linecolor="white", tickcolor="white", zerolinecolor="rgb(17,17,17)"),
-                    updatemenudefaults=dict(bgcolor="rgb(115, 115, 115)")
-                    )
-    )
-    pio.templates["plotly_white_custom"].update(
-        layout=dict(yaxis=dict(linecolor="black", tickcolor="black", zerolinecolor="white"),
-                    xaxis=dict(linecolor="black", tickcolor="black", zerolinecolor="white"),
-                    updatemenudefaults=dict(bgcolor="rgb(204, 204, 204)")
-                    )
-    )
+    return fig, upper, log_upper, track_data, stat_dict, number_of_tracks
 
-    # compute upper thresholds for y axis
-    upper = max(coverage_df["coverage"]+max(coverage_df["coverage"]/10))
-    log_upper = max(1, math.ceil(math.log10(upper)))
 
-    # global formatting
-    fig.update_layout(
-        template="plotly_white_custom",
-        hovermode="closest",
-        font=dict(
-            family=config.font,
-            size=config.font_size,
-        ),
-        # Add buttons
-        updatemenus=[
-            dict(
-                type="buttons",
-                direction="left",
-                buttons=[
-                    dict(
-                        args=[{"yaxis.type": "linear", "yaxis.range": [0, upper], "yaxis.autorange": False}],
-                        label="linear",
-                        method="relayout"
-                    ),
-                    dict(
-                        args=[{"yaxis.type": "log", "yaxis.range": [0, log_upper], "yaxis.autorange": False}],
-                        label="log",
-                        method="relayout"
-                    ),
-                    dict(args=[{"template": pio.templates["plotly_dark_custom"], "visible": True}],
-                         label="dark",
-                         method="relayout"),
-                    dict(args=[{"template": pio.templates["plotly_white_custom"], "visible": True}],
-                         label="light",
-                         method="relayout"),
-                ],
-                pad={"r": 10, "t": 1},
-                showactive=False,
-                xanchor="left",
-                y=1.15,
-                yanchor="top"
-            )
-        ],
-        # add global stats as annotation
-        annotations=[
-            dict(text=title, y=1.14, yref="paper",
-                 align="center", showarrow=False)
-        ]
-    )
-    # global x axes
-    fig.update_xaxes(
-        mirror=False,
-        showline=True,
-        linewidth=1,
-        ticks="outside",
-        minor_ticks="outside",
-        range=[0-max(coverage_df["position"])/50, max(coverage_df["position"])+max(coverage_df["position"])/50],
-        showgrid=False,
-    )
-    # global y axis
-    fig.update_yaxes(
-        mirror=False,
-        zeroline=False,
-        showline=True,
-        linewidth=1,
-        ticks="outside",
-        minor_ticks="outside",
-        showgrid=False
-    )
-    # if a range slider is shown, do not display the xaxis title
-    # (will be shown underneath)
-    if args.slider:
-        # last y axis
-        fig.update_xaxes(
-            rangeslider=dict(
-                visible=True,
-                thickness=0.05
-            ),
-            row=number_of_tracks
-        )
+def _dump_reference(args, ref, track_data, stat_dict, multi):
+    """
+    Write the per-reference dump sidecars for ``--dump``.
+
+    :param args: parsed CLI args
+    :param ref: reference id
+    :param track_data: track data list for this reference
+    :param stat_dict: bam stats dict for this reference
+    :param multi: whether more than one reference is being plotted; when False
+        the original ``{prefix}_*`` names are used (no ref token) for backward
+        compatibility
+    """
+    if multi:
+        safe_ref = html_mod._sanitize_ref_id(ref)
+        prefix = f"{args.prefix}_{safe_ref}"
     else:
-        # last x axis
-        fig.update_xaxes(title_text="genome position", row=number_of_tracks, col=1)
+        prefix = args.prefix
+    vcf_track_count, bed_track_count, gb_track_count = 0, 0, 0
+    pd.DataFrame.from_dict(stat_dict, orient="index").to_csv(
+        f"{prefix}_bam_stats.tabular", sep="\t", header=False, index=True)
+    if track_data:
+        for track in track_data:
+            if track[1] == "vcf":
+                track[0] = track[0].drop(['position_jittered'], axis=1)  # do not report jittered position
+                track[0].to_csv(f"{prefix}_vcf_data_{vcf_track_count}.tabular", sep="\t", header=True, index=False)
+                vcf_track_count += 1
+            elif track[1] == "bed":
+                bed_df = pd.DataFrame.from_dict(track[0]["bed annotations"], orient="index")
+                bed_df.drop("track", axis=1, inplace=True)
+                bed_df.to_csv(f"{prefix}_bed_data_{bed_track_count}.tabular", sep="\t", header=True, index=False)
+                bed_track_count += 1
+            elif track[1] == "gb":
+                with open(f"{prefix}_gb_data_{gb_track_count}.json", "w") as fp:
+                    json.dump(track[0], fp)
+                gb_track_count += 1
+
+
+def main(sysargs=sys.argv[1:]):
+    """
+    main function for data extraction and plotting
+    """
+    # parse args
+    args = get_args(sysargs)
+
+    # resolve reference ids: default to all references in the bam header
+    with pysam.AlignmentFile(args.bam, "rb") as bam:
+        available_refs = list(bam.references)
+    if not args.ref_id:
+        refs = available_refs
+        logger.info("no ref-id given, using all %d reference(s) in bam", len(refs))
+    else:
+        refs = args.ref_id
+        missing = [r for r in refs if r not in available_refs]
+        if missing:
+            logger.error(
+                "ref id(s) %s do not exist in bam file. Available references are %s",
+                missing, available_refs)
+            sys.exit(1)
+
+    # load data and build a figure per reference
+    ref_figures = {}
+    for ref in refs:
+        try:
+            fig, upper, log_upper, track_data, stat_dict, number_of_tracks = _load_reference(args, ref)
+        except data.ReferenceNotFoundError as exc:
+            # already validated above, but guard against races / zero-length refs
+            logger.error("%s", exc)
+            sys.exit(1)
+        ref_figures[ref] = {
+            "fig": fig,
+            "upper": upper,
+            "log_upper": log_upper,
+            "track_data": track_data,
+            "stat_dict": stat_dict,
+            "number_of_tracks": number_of_tracks,
+        }
+        logger.info("built figure for reference '%s'", ref)
+
+    multi = len(ref_figures) >= 2
+
     # export one file per requested suffix
-    static_prepared = False
     for suffix in args.suffix:
         if suffix == "html":
-            fig.write_html(f"{args.prefix}.html")
+            # Always build the master HTML, even for a single reference. This
+            # keeps the output consistent: the dropdown just lists the one
+            # available reference and the global log/linear toggle is always
+            # present next to it.
+            html_mod.build_master_html(ref_figures, args.prefix)
         else:
-            # apply static-image layout cleanup once before the first static export
-            if not static_prepared:
-                if config.show_log:  # correct log layout
-                    fig.update_yaxes(type="log", dtick=1, row=1, range=[0, log_upper], autorange=False)
-                fig.update_layout(updatemenus=[dict(visible=False)])  # no buttons
-                fig.update_layout(annotations=[dict(visible=False)])  # no annotations
-                static_prepared = True
-            fig.write_image(f"{args.prefix}.{suffix}", width=args.dimensions[0], height=args.dimensions[1])
+            # static image: one file per reference as {prefix}_{ref}.{suffix}
+            for ref, payload in ref_figures.items():
+                fig = payload["fig"]
+                log_upper = payload["log_upper"]
+                # apply static-image layout cleanup on a copy so the HTML figure
+                # (already written or about to be written) keeps its buttons.
+                # deepcopy preserves the subplot grid (JSON round-trip does not).
+                static_fig = copy.deepcopy(fig)
+                plotting.prepare_static(static_fig, log_upper)
+                if multi:
+                    safe_ref = html_mod._sanitize_ref_id(ref)
+                    out = f"{args.prefix}_{safe_ref}.{suffix}"
+                else:
+                    out = f"{args.prefix}.{suffix}"
+                static_fig.write_image(out, width=args.dimensions[0], height=args.dimensions[1])
 
-    # dump track data
-    vcf_track_count, bed_track_count, gb_track_count = 0, 0, 0
+    # dump track data (per reference)
     if args.dump:
-        pd.DataFrame.from_dict(stat_dict, orient="index").to_csv(f"{args.prefix}_bam_stats.tabular", sep="\t", header=False, index=True)
-        if track_data:
-            for track in track_data:
-                if track[1] == "vcf":
-                    track[0] = track[0].drop(['position_jittered'], axis=1)  # do not report jittered position
-                    track[0].to_csv(f"{args.prefix}_vcf_data_{vcf_track_count}.tabular", sep="\t", header=True, index=False)
-                    vcf_track_count += 1
-                elif track[1] == "bed":
-                    bed_df = pd.DataFrame.from_dict(track[0]["bed annotations"], orient="index")
-                    bed_df.drop("track", axis=1, inplace=True)
-                    bed_df.to_csv(f"{args.prefix}_bed_data_{bed_track_count}.tabular", sep="\t", header=True, index=False)
-                    bed_track_count += 1
-                elif track[1] == "gb":
-                    with open(f"{args.prefix}_gb_data_{gb_track_count}.json", "w") as fp:
-                        json.dump(track[0], fp)
-                    gb_track_count += 1
+        for ref, payload in ref_figures.items():
+            _dump_reference(args, ref, payload["track_data"], payload["stat_dict"], multi)

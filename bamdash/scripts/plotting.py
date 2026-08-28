@@ -3,19 +3,148 @@ contains defs for plotting
 """
 
 # BUILT-INS
+import math
 import statistics
 import sys
 import logging
 from collections import Counter
 
 import pandas as pd
-# LIBS
-import plotly.graph_objects as go
 import plotly.express as px
-# BAMDASH
+import plotly.graph_objects as go
+import plotly.io as pio
+from plotly.subplots import make_subplots
+
 from bamdash.scripts import config
 
 logger = logging.getLogger("bamdash")
+
+
+def _ensure_custom_templates():
+    """Register the plotly_white_custom template (idempotent).
+
+    """
+    pio.templates["plotly_white_custom"] = pio.templates["plotly_white"]
+    pio.templates["plotly_white_custom"].update(
+        layout=dict(yaxis=dict(linecolor="black", tickcolor="black", zerolinecolor="white"),
+                    xaxis=dict(linecolor="black", tickcolor="black", zerolinecolor="white"),
+                    updatemenudefaults=dict(bgcolor="rgb(204, 204, 204)")
+                    )
+    )
+
+
+def build_figure(ref, coverage_df, track_data, number_of_tracks, track_heights,
+                 title, args):
+    """
+    Build a complete plotly subplot figure for a single reference.
+
+    Encapsulates the figure construction, track plotting, custom template,
+    stats annotation and axis formatting that previously lived inline in
+    ``command.main``. Called once per reference. The linear/log y-axis
+    toggle is provided globally by the master HTML page (next to the
+    reference dropdown) and applies to all subfigures at once, so no
+    per-figure updatemenu buttons are added here.
+
+    :param ref: reference id (used only for logging context)
+    :param coverage_df: per-position coverage dataframe for this reference
+    :param track_data: list of ``[data, type]`` / ``[data, "gb", seq]`` tracks for this ref
+    :param number_of_tracks: total subplot rows (coverage + non-empty tracks) for this ref
+    :param track_heights: relative row heights for ``make_subplots``
+    :param title: stats annotation string (ref-specific) for this reference
+    :param args: parsed CLI args (uses binsize, slider)
+    :return: ``(fig, upper, log_upper)`` where upper/log_upper are the linear/log
+        y-axis thresholds for the coverage axis of this reference
+    """
+    _ensure_custom_templates()
+
+    fig = make_subplots(
+        rows=number_of_tracks,
+        cols=1,
+        shared_xaxes=True,
+        row_heights=track_heights,
+        vertical_spacing=config.plot_spacing,
+    )
+    # coverage plot
+    create_coverage_plot(fig, 1, coverage_df, args.binsize)
+    # track plots
+    if track_data:
+        for index, track in enumerate(track_data):
+            row = index + 2
+            if track[1] == "vcf":
+                create_vcf_plot(fig, row, track[0])
+            elif track[1] == "gb":
+                create_track_plot(fig, row, track[0], config.box_gb_size, config.box_gb_alpha)
+            elif track[1] == "bed":
+                create_track_plot(fig, row, track[0], config.box_bed_size, config.box_bed_alpha)
+
+    # compute upper thresholds for y axis
+    upper = max(coverage_df["coverage"] + max(coverage_df["coverage"] / 10))
+    log_upper = max(1, math.ceil(math.log10(upper)))
+
+    # global formatting. No per-figure linear/log updatemenu buttons are
+    # added: the master HTML page provides a single global log/linear
+    # toggle (next to the reference dropdown) that relayouts every
+    # subfigure at once, so per-figure buttons would be redundant.
+    fig.update_layout(
+        template="plotly_white_custom",
+        hovermode="closest",
+        font=dict(
+            family=config.font,
+            size=config.font_size,
+        ),
+        # add global stats as annotation
+        annotations=[
+            dict(text=title, y=1.14, yref="paper",
+                 align="center", showarrow=False)
+        ]
+    )
+    # global x axes
+    fig.update_xaxes(
+        mirror=False,
+        showline=True,
+        linewidth=1,
+        ticks="outside",
+        minor_ticks="outside",
+        range=[0 - max(coverage_df["position"]) / 50, max(coverage_df["position"]) + max(coverage_df["position"]) / 50],
+        showgrid=False,
+    )
+    # global y axis
+    fig.update_yaxes(
+        mirror=False,
+        zeroline=False,
+        showline=True,
+        linewidth=1,
+        ticks="outside",
+        minor_ticks="outside",
+        showgrid=False
+    )
+    # if a range slider is shown, do not display the xaxis title
+    if args.slider:
+        fig.update_xaxes(
+            rangeslider=dict(
+                visible=True,
+                thickness=0.05
+            ),
+            row=number_of_tracks
+        )
+    else:
+        fig.update_xaxes(title_text="genome position", row=number_of_tracks, col=1)
+
+    return fig, upper, log_upper
+
+
+def prepare_static(fig, log_upper):
+    """
+    Apply the static-image layout cleanup to a figure in place: log y-axis if
+    configured, hide updatemenus and annotations. Used before ``write_image``.
+
+    :param fig: plotly figure to mutate
+    :param log_upper: log y-axis upper bound for the coverage axis
+    """
+    if config.show_log:  # correct log layout
+        fig.update_yaxes(type="log", dtick=1, row=1, range=[0, log_upper], autorange=False)
+    fig.update_layout(updatemenus=[dict(visible=False)])  # no buttons
+    fig.update_layout(annotations=[dict(visible=False)])  # no annotations
 
 
 def create_coverage_plot(fig, row, coverage_df, bin_size):

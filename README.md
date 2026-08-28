@@ -14,10 +14,11 @@
 
 **BAMdash lets you create interactive coverage plots from your bam file with [`plotly`](https://plotly.com/)**
 
-- **requires** only a `.bam`, `.bai` and the reference id to which the reads where mapped
+- **requires** only a `.bam`, `.bai` and the reference id(s) to which the reads where mapped
 - **create** a interactive `html` for data exploration
 - **create** a static image (`jpg`, `png`, `pdf`, `svg`) ready for publication
 - **add** additional tracks (supported: `.vcf`, `.gb`, `.bed`)
+- **plot** multiple references in a single `html` with a dropdown to switch between them
 - **annotate** tracks with additional information
 - **export** annoated track data as tabular files (`.bed`, `.vcf`) or json (`.gb`)
 - **developed** for viral genomics
@@ -91,8 +92,10 @@ full usage:
 
   -h, --help            show this help message and exit
   -b BAM, --bam BAM     bam file location
-  -r REF_ID, --ref-id REF_ID
-                        seq reference id (default: first reference in bam)
+  -r [REF_ID ...], --ref-id [REF_ID ...]
+                        seq reference id(s); default: all references in bam.
+                        When more than one reference is plotted, the output html
+                        contains a dropdown to switch between references.
   -p ./plot, --prefix ./plot
                         path and partial filename for output files
   -s [html ...], --suffix [html ...]
@@ -126,6 +129,34 @@ https://zenodo.org/api/records/10159816/files-archive
 ```shell
 bamdash -b HEV.bam -r HEV-pat-1 -t HEV.vcf HEVprim.bed HEVamp.bed HEV.gb
 ```
+
+## Multiple references
+
+By default BAMdash now plots **all** references found in the bam header. When
+more than one reference is plotted, the output `html` contains a **dropdown
+menu** to switch between the per-reference figures. Each reference gets its own
+figure showing only the tracks that contain data for that reference, so a
+single multi-reference `.vcf` or `.bed` file is automatically split across the
+references it contains.
+
+```shell
+# plot every reference in the bam (dropdown in the output html)
+bamdash -b multi.bam -t variants.vcf regions.bed
+
+# plot a subset of references
+bamdash -b multi.bam -r refA refB -t variants.vcf regions.bed
+
+# a single reference still produces a plain plotly html (no dropdown)
+bamdash -b multi.bam -r refA -t variants.vcf regions.bed
+```
+
+Static image export (e.g. `--suffix png`) writes one image per reference as
+`{prefix}_{ref}.{suffix}` when multiple references are plotted (a single
+reference keeps the original `{prefix}.{suffix}` name). Likewise `--dump`
+writes per-reference sidecars (`{prefix}_{ref}_bam_stats.tabular`, etc.).
+
+The master `html` inlines the plotly.js bundle once, so it is fully usable
+offline.
 
 
 ## Cutomization

@@ -3,7 +3,6 @@ contains defs for data analysis
 """
 # BUILT INS
 import math
-import sys
 import logging
 
 # LIBS
@@ -14,6 +13,10 @@ import pysam
 from pysam import VariantFile
 
 logger = logging.getLogger("bamdash")
+
+
+class ReferenceNotFoundError(ValueError):
+    """Raised when a requested reference id is not present in the bam file."""
 
 
 def make_stat_substring(stat_string, name, value):
@@ -88,7 +91,7 @@ def bam_to_coverage_df(bam_file, ref, min_cov, quality_thres):
     if ref not in bam.references:
         logger.error("ref id '%s' does not exist in bam file. Available references are %s",
                      ref, bam.references)
-        sys.exit(1)
+        raise ReferenceNotFoundError(f"ref id '{ref}' does not exist in bam file")
 
     coverage, position = [], []
     # count coverage at each pos
