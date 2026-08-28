@@ -243,9 +243,14 @@ class TestOfflineOnlineArg:
     def test_no_offline_loads_plotly_from_cdn(self, two_ref_bam, two_ref_vcf, two_ref_bed, tmp_out):
         out = _run(two_ref_bam, tmp_out, ["-t", str(two_ref_vcf), str(two_ref_bed), "--no-offline"])
         html = Path(f"{out}.html").read_text()
-        # plotly.js is loaded from the CDN, not inlined
-        import plotly
-        assert f"cdn.plot.ly/plotly-{plotly.__version__}.min.js" in html
+        # plotly.js is loaded from the CDN, not inlined. The URL must reference
+        # the bundled plotly.js version (get_plotlyjs_version), NOT the python
+        # plotly package version: the two diverged (e.g. plotly 6.5.0 ships
+        # plotly.js v3.3.0) and a URL built from the python version 404s/403s,
+        # so plotly never loads and no figure renders.
+        import plotly.offline as pyo
+        js_version = pyo.get_plotlyjs_version()
+        assert f"cdn.plot.ly/plotly-{js_version}.min.js" in html
         # the CDN file is much smaller than the inlined bundle
         assert len(html) < 500_000
 

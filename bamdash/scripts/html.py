@@ -71,8 +71,15 @@ def build_master_html(ref_figures, prefix, offline=True):
         plotly_js = pyo.get_plotlyjs()
         plotly_tag = f"<script>{plotly_js}</script>"
     else:
-        # load plotly.js from the CDN; keeps the html small but needs internet
-        plotly_version = plotly.__version__
+        # load plotly.js from the CDN; keeps the html small but needs internet.
+        # NOTE: use the bundled plotly.js version, NOT plotly.__version__ (the
+        # python package version). The two diverged long ago: plotly 6.5.0
+        # ships plotly.js v3.3.0. Using the python version produces a CDN URL
+        # for a JS release that does not exist (403), so plotly never loads and
+        # no figure renders. get_plotlyjs_version() returns the exact version
+        # of the JS bundle that fig.to_html() targets, so the CDN URL always
+        # matches the figure's expected plotly.js.
+        plotly_version = pyo.get_plotlyjs_version()
         plotly_tag = (
             f'<script src="https://cdn.plot.ly/plotly-{plotly_version}.min.js">'
             f"</script>"
