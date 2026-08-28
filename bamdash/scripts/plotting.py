@@ -3,16 +3,148 @@ contains defs for plotting
 """
 
 # BUILT-INS
+import logging
+import math
 import statistics
 import sys
+from collections import Counter
 
 import pandas as pd
-from collections import Counter
-# LIBS
-import plotly.graph_objects as go
 import plotly.express as px
-# BAMDASH
+import plotly.graph_objects as go
+import plotly.io as pio
+from plotly.subplots import make_subplots
+
 from bamdash.scripts import config
+
+logger = logging.getLogger("bamdash")
+
+
+def _ensure_custom_templates():
+    """Register the plotly_white_custom template (idempotent).
+
+    """
+    pio.templates["plotly_white_custom"] = pio.templates["plotly_white"]
+    pio.templates["plotly_white_custom"].update(
+        layout={"yaxis": {"linecolor": "black", "tickcolor": "black", "zerolinecolor": "white"},
+                    "xaxis": {"linecolor": "black", "tickcolor": "black", "zerolinecolor": "white"},
+                    "updatemenudefaults": {"bgcolor": "rgb(204, 204, 204)"}
+                    }
+    )
+
+
+def build_figure(ref, coverage_df, track_data, number_of_tracks, track_heights,
+                 title, args):
+    """
+    Build a complete plotly subplot figure for a single reference.
+
+    Encapsulates the figure construction, track plotting, custom template,
+    stats annotation and axis formatting that previously lived inline in
+    ``command.main``. Called once per reference. The linear/log y-axis
+    toggle is provided globally by the master HTML page (next to the
+    reference dropdown) and applies to all subfigures at once, so no
+    per-figure updatemenu buttons are added here.
+
+    :param ref: reference id (used only for logging context)
+    :param coverage_df: per-position coverage dataframe for this reference
+    :param track_data: list of ``[data, type]`` / ``[data, "gb", seq]`` tracks for this ref
+    :param number_of_tracks: total subplot rows (coverage + non-empty tracks) for this ref
+    :param track_heights: relative row heights for ``make_subplots``
+    :param title: stats annotation string (ref-specific) for this reference
+    :param args: parsed CLI args (uses binsize, slider)
+    :return: ``(fig, upper, log_upper)`` where upper/log_upper are the linear/log
+        y-axis thresholds for the coverage axis of this reference
+    """
+    _ensure_custom_templates()
+
+    fig = make_subplots(
+        rows=number_of_tracks,
+        cols=1,
+        shared_xaxes=True,
+        row_heights=track_heights,
+        vertical_spacing=config.plot_spacing,
+    )
+    # coverage plot
+    create_coverage_plot(fig, 1, coverage_df, args.binsize)
+    # track plots
+    if track_data:
+        for index, track in enumerate(track_data):
+            row = index + 2
+            if track[1] == "vcf":
+                create_vcf_plot(fig, row, track[0])
+            elif track[1] == "gb":
+                create_track_plot(fig, row, track[0], config.box_gb_size, config.box_gb_alpha)
+            elif track[1] == "bed":
+                create_track_plot(fig, row, track[0], config.box_bed_size, config.box_bed_alpha)
+
+    # compute upper thresholds for y axis
+    upper = max(coverage_df["coverage"] + max(coverage_df["coverage"] / 10))
+    log_upper = max(1, math.ceil(math.log10(upper)))
+
+    # global formatting. No per-figure linear/log updatemenu buttons are
+    # added: the master HTML page provides a single global log/linear
+    # toggle (next to the reference dropdown) that relayouts every
+    # subfigure at once, so per-figure buttons would be redundant.
+    fig.update_layout(
+        template="plotly_white_custom",
+        hovermode="closest",
+        font={
+            "family": config.font,
+            "size": config.font_size,
+        },
+        # add global stats as annotation
+        annotations=[
+            {"text": title, "y": 1.14, "yref": "paper",
+                 "align": "center", "showarrow": False}
+        ]
+    )
+    # global x axes
+    fig.update_xaxes(
+        mirror=False,
+        showline=True,
+        linewidth=1,
+        ticks="outside",
+        minor_ticks="outside",
+        range=[0 - max(coverage_df["position"]) / 50, max(coverage_df["position"]) + max(coverage_df["position"]) / 50],
+        showgrid=False,
+    )
+    # global y axis
+    fig.update_yaxes(
+        mirror=False,
+        zeroline=False,
+        showline=True,
+        linewidth=1,
+        ticks="outside",
+        minor_ticks="outside",
+        showgrid=False
+    )
+    # if a range slider is shown, do not display the xaxis title
+    if args.slider:
+        fig.update_xaxes(
+            rangeslider={
+                "visible": True,
+                "thickness": 0.05
+            },
+            row=number_of_tracks
+        )
+    else:
+        fig.update_xaxes(title_text="genome position", row=number_of_tracks, col=1)
+
+    return fig, upper, log_upper
+
+
+def prepare_static(fig, log_upper):
+    """
+    Apply the static-image layout cleanup to a figure in place: log y-axis if
+    configured, hide updatemenus and annotations. Used before ``write_image``.
+
+    :param fig: plotly figure to mutate
+    :param log_upper: log y-axis upper bound for the coverage axis
+    """
+    if config.show_log:  # correct log layout
+        fig.update_yaxes(type="log", dtick=1, row=1, range=[0, log_upper], autorange=False)
+    fig.update_layout(updatemenus=[{"visible": False}])  # no buttons
+    fig.update_layout(annotations=[{"visible": False}])  # no annotations
 
 
 def create_coverage_plot(fig, row, coverage_df, bin_size):
@@ -48,7 +180,8 @@ def create_coverage_plot(fig, row, coverage_df, bin_size):
     elif bin_size == 1:
         coverage_df_plot = coverage_df
     else:
-        sys.exit("ERROR: bin size below 1 is not valid")
+        logger.error("bin size below 1 is not valid")
+        sys.exit(1)
 
     # define hover template
     h_template = ""
@@ -63,11 +196,10 @@ def create_coverage_plot(fig, row, coverage_df, bin_size):
             customdata=coverage_df_plot,
             fill="tonexty",
             fillcolor=config.coverage_fill_color,
-            line=dict(color=config.coverage_line_color),
+            line={"color": config.coverage_line_color},
             hovertemplate=h_template,
             legendgroup="coverage",
-            legendgrouptitle_text="coverage",
-            name="",
+            name="coverage",
             showlegend=True
         ),
         row=row,
@@ -82,11 +214,10 @@ def create_coverage_plot(fig, row, coverage_df, bin_size):
             text=["", f"{round(average_cov)}x"],
             textposition="bottom left",
             mode="lines+text",
-            line=dict(color=config.average_line_color, width=config.average_line_width, dash="dash"),
+            line={"color": config.average_line_color, "width": config.average_line_width, "dash": "dash"},
             showlegend=True,
             legendgroup="average",
-            name="",
-            legendgrouptitle_text="average",
+            name="average",
         ),
         row=row,
         col=1
@@ -117,36 +248,53 @@ def split_vcf_df(df):
         return [df]
 
 
-def adjust_array_min_distance(values: list, min_distance: float, max_values, max_iterations: int = 100) -> list:
+def adjust_array_min_distance(
+    values: list[float],
+    min_distance: float,
+    max_iterations: int = 1000,
+    tolerance: float = 1e-6,
+) -> list[float]:
     """
-    Adjust values in a 1D array to maintain a minimum distance while staying close to their original values.
+    Adjust 1D values to keep a minimum distance with minimal deviation.
 
-    :param values: List of values to adjust
-    :param min_distance: The required minimum distance between values.
-    :param max_values: boundaries
-    :param max_iterations: Maximum number of iterations for convergence.
+    Ported from ResistanceProfiler's implementation: an iterative algorithm
+    that walks *sorted* values and separates neighbouring entries when they
+    are closer than ``min_distance``. The array is re-sorted every iteration
+    because value mutations from previous passes can change the ordering.
+    Convergence is detected when the largest per-iteration adjustment falls
+    below ``tolerance``.
 
-    :return: Adjusted values ensuring the minimum distance and minimal deviation.
+    :param values: values to adjust
+    :param min_distance: required minimum distance between neighbouring values
+    :param max_iterations: upper bound on refinement iterations
+    :param tolerance: convergence threshold for the max per-iteration adjustment
+    :return: adjusted values with the same ordering as the input
     """
+    arr = list(values)
+    n = len(arr)
+    if n == 0:
+        return []
+    if n == 1:
+        return [float(arr[0])]
+
     for _ in range(max_iterations):
-        for i in range(1, len(values)):
-            idx1, idx2 = i-1, i
-            if values[idx2] - values[idx1] < min_distance:
-                # Calculate the midpoint for adjustment
-                adjustment = (min_distance - (values[idx2] - values[idx1])) / 2
-                # Adjust values to separate while minimizing deviation
-                if values[idx1] - adjustment >= 0-max_values[0]/50:  # outside boundaries?
-                    values[idx1] -= adjustment
-                else:
-                    values[idx1] = 0 - max_values[0] / 100  # half way to boundary
+        # re-sort each iteration: value mutations from previous passes change
+        # the ordering, so the neighbour pairs to check change too.
+        sorted_indices = sorted(range(n), key=lambda i: arr[i])
+        max_adjustment = 0.0
+        for i in range(1, n):
+            idx1 = sorted_indices[i - 1]
+            idx2 = sorted_indices[i]
+            gap = arr[idx2] - arr[idx1]
+            if gap < min_distance - tolerance:
+                push = (min_distance - gap) / 2.0
+                arr[idx1] -= push
+                arr[idx2] += push
+                max_adjustment = max(max_adjustment, push)
+        if max_adjustment < tolerance:
+            break
 
-                if values[idx2] + adjustment <= max_values[1]:
-                    values[idx2] += adjustment
-                else:
-                    values[idx2] = max_values[1] + max_values[1] / 100
-
-
-    return values
+    return [float(v) for v in arr]
 
 
 def create_vcf_plot(fig, row, vcf_df):
@@ -167,14 +315,27 @@ def create_vcf_plot(fig, row, vcf_df):
             if x_values is not None:
                 max_x = max(x_values)
 
-    # adjust the min distance based on number of variant thresholds
-    for var_n, divider in zip([5, 25, 100, 500], [100, 25, 5, 1]):
-        if var_n < len(vcf_df["position"]) and var_n != 500:
-            continue
-        min_distance = max_x / len(vcf_df["position"]) / divider
-        break
-    # jitter vcf positions
-    vcf_df["position_jittered"] = adjust_array_min_distance(list(vcf_df["position"]), min_distance=min_distance, max_values=[0, max_x])
+    # Jitter the top-dot x positions so overlapping variants are dispersed.
+    # Ported from ResistanceProfiler's _apply_top_jitter: sort by (position,
+    # allele frequency) so ties break deterministically, then enforce a minimum
+    # separation of max_x / 200 — the same 1/200-of-the-visible-range ratio the
+    # reference uses (feature_length / 200), scaled to the coverage x-axis. The
+    # stem stays anchored at the true genomic position; only the top dot shifts.
+    sorted_indices = sorted(
+        range(len(vcf_df)),
+        key=lambda i: (vcf_df["position"].iloc[i],
+                       vcf_df["AF"].iloc[i] if "AF" in vcf_df else 0),
+    )
+    sorted_positions = [vcf_df["position"].iloc[i] for i in sorted_indices]
+    min_distance = max_x / 200
+    jittered_sorted = adjust_array_min_distance(
+        sorted_positions, min_distance=min_distance)
+
+    # scatter back into original row order
+    jittered = [0.0] * len(vcf_df)
+    for orig_idx, jit_x in zip(sorted_indices, jittered_sorted):
+        jittered[orig_idx] = jit_x
+    vcf_df["position_jittered"] = jittered
 
     # add stem independent of upper layers
     if "AF" in vcf_df:
@@ -188,20 +349,20 @@ def create_vcf_plot(fig, row, vcf_df):
                             (x_value, -0.15, x_value_jittered, 0),
                             (x_value_jittered, 0, x_value_jittered, y_value)]:
             shapes.append(
-                dict(
-                    type="line",
-                    xref=f"x{row}",
-                    yref=f"y{row}",
-                    x0=coordinates[0],
-                    y0=coordinates[1],
-                    x1=coordinates[2],
-                    y1=coordinates[3],
-                    line=dict(
-                        color=config.stem_color,
-                        width=config.stem_width
-                    ),
-                    layer='below'
-                )
+                {
+                    "type": "line",
+                    "xref": f"x{row}",
+                    "yref": f"y{row}",
+                    "x0": coordinates[0],
+                    "y0": coordinates[1],
+                    "x1": coordinates[2],
+                    "y1": coordinates[3],
+                    "line": {
+                        "color": config.stem_color,
+                        "width": config.stem_width
+                    },
+                    "layer": 'below'
+                }
             )
 
     # plot shape in each subplot
@@ -240,21 +401,20 @@ def create_vcf_plot(fig, row, vcf_df):
                 go.Scatter(
                     x=vcf_subset["position_jittered"],
                     y=y_data,
-                    name=f"plot {row}",
+                    name=mut,
                     legendgroup=mut,
-                    legendgrouptitle_text=mut,
                     mode="markers",
                     customdata=vcf_subset,
                     showlegend=show_legend,
                     hovertemplate=h_template,
-                    marker=dict(
-                        color=color,
-                        size=config.variant_marker_size,
-                        line=dict(
-                            color=config.variant_line_color,
-                            width=config.variant_marker_line_width
-                        )
-                    )
+                    marker={
+                        "color": color,
+                        "size": config.variant_marker_size,
+                        "line": {
+                            "color": config.variant_line_color,
+                            "width": config.variant_marker_line_width
+                        }
+                    }
                 ),
             row=row,
             col=1
@@ -327,15 +487,15 @@ def create_track_plot(fig, row, feature_dict, box_size, box_alpha):
                     y=[track],
                     legendgroup=feature,
                     mode="markers",
-                    marker=dict(
-                        size=config.strand_marker_size,
-                        symbol=marker_type,
-                        color=color,
-                        line=dict(
-                            width=config.strand_marker_line_width,
-                            color=config.strand_marker_line_color
-                        )
-                    ),
+                    marker={
+                        "size": config.strand_marker_size,
+                        "symbol": marker_type,
+                        "color": color,
+                        "line": {
+                            "width": config.strand_marker_line_width,
+                            "color": config.strand_marker_line_color
+                        }
+                    },
                     name="",
                     showlegend=False,
                     hoverinfo="text",
@@ -359,9 +519,8 @@ def create_track_plot(fig, row, feature_dict, box_size, box_alpha):
                             x=[line_x[0], line_x[1]],
                             y=[track, track],  # y-coordinate of the hline
                             mode='lines',
-                            line=dict(color=color_thes[cycle]),
+                            line={"color": color_thes[cycle]},
                             legendgroup=feature,
-                            legendgrouptitle_text=feature,
                             hoverinfo='skip',
                             showlegend=False,
                         ),
@@ -376,12 +535,11 @@ def create_track_plot(fig, row, feature_dict, box_size, box_alpha):
                         mode="lines",
                         fill="toself",
                         fillcolor=color_thes[cycle],
-                        line=dict(color=color_thes[cycle]),
+                        line={"color": color_thes[cycle]},
                         showlegend=legend_vis if previous_legend_vis is None else False,  # edge case for tracks that start with part features and result in legend duplication
                         hoverinfo='skip',
-                        name=f"plot {row}",
+                        name=feature,
                         legendgroup=feature,
-                        legendgrouptitle_text=feature,
                     ),
                     row=row,
                     col=1

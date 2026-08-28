@@ -1,10 +1,10 @@
 
 <img src="./bamdash.png" alt="bamdash" />
 
-[![language](https://img.shields.io/badge/python-%3E3.9-green)](https://www.python.org/)
+[![language](https://img.shields.io/badge/python-%3E3.11,%3C3.14-green)](https://www.python.org/)
 [![License: GPL v3](https://img.shields.io/github/license/jonas-fuchs/bamdash)](https://www.gnu.org/licenses/gpl-3.0)
 ![Static Badge](https://img.shields.io/badge/platform-linux_osx-blue)
-[![DOI](https://zenodo.org/badge/700952196.svg)](https://zenodo.org/badge/latestdoi/700952196)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17913086.svg)](https://zenodo.org/records/17913086)
 [![PiPy](https://img.shields.io/pypi/v/bamdash?label=pypi%20version)](https://pypi.org/project/bamdash/)
 [![Downloads](https://static.pepy.tech/badge/bamdash)](https://pypi.org/project/bamdash/)
 [![CONDA](https://img.shields.io/conda/v/bioconda/bamdash?label=conda%20version)](https://anaconda.org/bioconda/bamdash)
@@ -14,13 +14,13 @@
 
 **BAMdash lets you create interactive coverage plots from your bam file with [`plotly`](https://plotly.com/)**
 
-- **requires** only a `.bam`, `.bai` and the reference id to which the reads where mapped
+- **requires** only a `.bam`
 - **create** a interactive `html` for data exploration
 - **create** a static image (`jpg`, `png`, `pdf`, `svg`) ready for publication
 - **add** additional tracks (supported: `.vcf`, `.gb`, `.bed`)
+- **plot** multiple references in a single `html` with a dropdown to switch between them
 - **annotate** tracks with additional information
-- **export** annoated track data as tabular files (`.bed`, `.vcf`) or json (`.gb`)
-- **developed** for viral genomics
+- **export** annotated track data as tabular files (`.bed`, `.vcf`) or json (`.gb`)
 - **customize** all plotting parameters
 
 **Feel free to report any bugs or request new features as issues!**
@@ -28,13 +28,13 @@
 
 ## Automatic annotation
 
-BAMdash automatically computes serveral statistics:
+BAMdash automatically computes several statistics:
 
 - if `-bs` is > 1 it computes the mean over the bin size in the coverage plot
 - for each track it computes recovery and mean coverage (set `-c` for the min coverage) for each element in the track
 - if a `*.vcf` is provided it annotates `TRANSITION`/`TRANSVERSION` and type of exchange (`SNP`, `DEL`, `INS`)
 
-If a `*.gb`and `*.vcf` is provided BAMdash computes if the mutations could have been caused by APOBEC deamination. 
+If a `*.gb` and `*.vcf` is provided BAMdash computes if the mutations could have been caused by APOBEC deamination. 
 Moreover, it annotates the aminoacid exchange and the effect in the CDS (inspired by but not as powerful as [snpeff](http://pcingola.github.io/SnpEff/snpeff)). SNP and INDEL vcf annotation supports:
 
 - `START_LOST`: INDEL or SNP start at the CDS and result in a start loss
@@ -56,11 +56,11 @@ The nomenclature for the aminoacid effect is pretty simplified:
 - `A58fsX` - Frameshift at pos 58
 
 ## Example
-<img src="./example.gif" alt="example" />
+<img src="./example.png" alt="example" />
 
 ## Installation
 
-### via pip (recommened):
+### via pip (recommended):
 ```shell
 pip install bamdash
 ```
@@ -84,27 +84,39 @@ You should see the current BAMdash version.
 ```shell
 usage: 	
 
-bamdash -b bam_file_path -r reference_id [additional arguments]
+bamdash -b bam_file_path [additional arguments]
 ```
 ```
 full usage:
 
   -h, --help            show this help message and exit
-  -b  , --bam           bam file location
-  -r  , --reference     seq reference id
+  -b BAM, --bam BAM     bam file location
+  -r [REF_ID ...], --ref-id [REF_ID ...]
+                        seq reference id(s); default: all references in bam
+  -p ./plot, --prefix ./plot
+                        path and partial filename for output files
+  -s [html ...], --suffix [html ...]
+                        output file extensions appended to prefix (allowed: html, png, jpg, jpeg, webp, svg, pdf, eps), multiple
+                        values allowed, default: html
   -q 15, --quality-threshold 15
-                        qaulity threshold for reads
-  -bs  , --binsize      bins for the coverage plot
+                        quality threshold for reads (default: 15)
+  -bs N, --binsize N    bins the coverage data into N bp bins (default: 1, no binning)
   -t [track_1 ...], --tracks [track_1 ...]
-                        file location of tracks
+                        file location of tracks (accepted: *.vcf, *.bed, *.gb, multiple paths to files allowed)
   -c 5, --coverage 5    minimum coverage
   --slider, --no-slider
-                        show slider (default: False)
-  -e None, --export_static None
-                        export as png, jpg, pdf, svg
+                        show slider
+  --offline, --no-offline
+                        inline the plotly.js bundle into the output html so the file is fully usable without an internet
+                        connection (default: True). Use --no-offline to load plotly.js from a CDN instead, which produces a much
+                        smaller html file but requires internet access to view
+  --custom-config TOML  path to a user-supplied TOML config file whose settings override the shipped defaults (see config.toml).
+                        Only the keys present in the file are overwritten; all others keep their default values
   -d px px, --dimensions px px
-                        width and height of the static image in px
-  --dump, --no-dump     dump annotated track data (default: False)
+                        width and height of static (non-html) output in px (default: 1920 1080; ignored when only html is
+                        requested)
+  --dump, --no-dump     dump annotated track data; filenames derive from --prefix (default: no dump)
+  --verbose             increase logging verbosity: --verbose for INFO, --verbose --verbose for DEBUG
   -v, --version         show program's version number and exit
 ```
 
@@ -118,62 +130,66 @@ https://zenodo.org/api/records/10159816/files-archive
 bamdash -b HEV.bam -r HEV-pat-1 -t HEV.vcf HEVprim.bed HEVamp.bed HEV.gb
 ```
 
+## Multiple references
 
-## Cutomization
+By default BAMdash now plots **all** references found in the bam header. When
+more than one reference is plotted, the output `html` contains a **dropdown
+menu** to switch between the per-reference figures. Each reference gets its own
+figure showing only the tracks that contain data for that reference, so a
+single multi-reference `.vcf` or `.bed` file is automatically split across the
+references it contains.
 
-BAMcov plotting settings can be adjusted in in the `config.py`. Therefore, you have to clone this repo.
-
-Go to the configs location:
 ```shell
-cd BAMdash/bamdash/scripts/
+# plot every reference in the bam (dropdown in the output html)
+bamdash -b multi.bam -t variants.vcf regions.bed
+
+# plot a subset of references
+bamdash -b multi.bam -r refA refB -t variants.vcf regions.bed
+
+# a single reference still produces a plain plotly html (no dropdown)
+bamdash -b multi.bam -r refA -t variants.vcf regions.bed
 ```
-And open the `config.py` with a text editor, e.g.:
+
+Static image export (e.g. `--suffix png`) writes one image per reference as
+`{prefix}_{ref}.{suffix}` when multiple references are plotted (a single
+reference keeps the original `{prefix}.{suffix}` name). Likewise `--dump`
+writes per-reference sidecars (`{prefix}_{ref}_bam_stats.tabular`, etc.).
+
+The master `html` inlines the plotly.js bundle once, so it is fully usable
+offline.
+
+
+## Customization
+
+BAMdash plotting settings are defined in a TOML config file. The shipped
+defaults live in [`bamdash/scripts/config.toml`](bamdash/scripts/config.toml).
+You can override individual settings without modifying the package by supplying
+your own TOML file via `--custom-config`. Only the keys present in your file
+are overwritten; all others keep their default values.
+
+1. Copy the shipped `config.toml` and adjust the values you want to change:
+
 ```shell
-gedit config.py
+cp bamdash/scripts/config.toml my_config.toml
+$EDITOR my_config.toml
 ```
-and adjust the settings:
-```python
-# pdf settings
-show_log = True
 
-# overall layout
-vcf_track_proportion = 0.3
-gb_track_proportion = 0.5
-bed_track_proportion = 0.2
-plot_spacing = 0.05
-
-# coverage customize
-coverage_fill_color = "rgba(255, 212, 135, 0.2)"
-coverage_line_color = "rgba(224, 168, 68, 1)"
-average_line_color = "grey"
-average_line_width = 1
-
-# track customize
-track_color_scheme = "agsunset"  # for mutiple annotations tracks (genebank)
-track_color_single = "rgb(145, 145, 145)"  # for single tracks (any rgb value, but no named colors)
-strand_types = ["triangle-right", "triangle-left", "diamond-wide"]  # +, -, undefined strand
-strand_marker_size = 8
-strand_marker_line_width = 1
-strand_marker_line_color = "rgba(0, 0, 0, 0.2)"
-box_bed_alpha = [0.6, 0.6]  # alpha values for boxes (bed)
-box_bed_size = [0.4, 0.4]  # size values for boxes (bed)
-box_gb_alpha = [0.6, 0.8]  # alpha values for boxes (gb)
-box_gb_size = [0.4, 0.3]  # size values for boxes (gb)
-
-# variant customize
-variant_marker_size = 13
-variant_marker_line_width = 1
-variant_line_color = "black"
-stem_color = "grey"
-stem_width = 1
-snp_color = "grey"
-ins_color = "blue"
-del_color = "red"
+```toml
+# example: only override coverage colors and the SNP marker color
+coverage_fill_color = "rgba(0, 100, 200, 0.3)"
+coverage_line_color = "rgba(0, 100, 200, 1)"
+snp_color = "purple"
 ```
-To apply these new settings just repeat the installation procedure in the BAMdash dir:
+
+2. Run bamdash with `--custom-config`:
+
 ```shell
-pip install .
+bamdash -b HEV.bam -r HEV-pat-1 -t HEV.vcf --custom-config my_config.toml
 ```
+
+All available settings and their default values are documented in the shipped
+[`config.toml`](bamdash/scripts/config.toml). Unknown keys are rejected with an
+error so typos do not get silently ignored.
 
 ---
 

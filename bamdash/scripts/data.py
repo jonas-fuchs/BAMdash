@@ -3,7 +3,8 @@ contains defs for data analysis
 """
 # BUILT INS
 import math
-import sys
+import logging
+from pathlib import Path
 
 # LIBS
 import pandas as pd
@@ -11,6 +12,12 @@ from Bio import Seq
 from Bio import SeqIO
 import pysam
 from pysam import VariantFile
+
+logger = logging.getLogger("bamdash")
+
+
+class ReferenceNotFoundError(ValueError):
+    """Raised when a requested reference id is not present in the bam file."""
 
 
 def make_stat_substring(stat_string, name, value):
@@ -83,7 +90,9 @@ def bam_to_coverage_df(bam_file, ref, min_cov, quality_thres):
     bam = pysam.AlignmentFile(bam_file, "rb")
 
     if ref not in bam.references:
-        sys.exit(f'WARNING: ref id does not exist in bam file. Available references are {bam.references}')
+        logger.error("ref id '%s' does not exist in bam file. Available references are %s",
+                     ref, bam.references)
+        raise ReferenceNotFoundError(f"ref id '{ref}' does not exist in bam file")
 
     coverage, position = [], []
     # count coverage at each pos
@@ -205,6 +214,24 @@ def define_track_position(feature_dict):
     return feature_dict
 
 
+def gb_record_ids(gb_file):
+    """
+    Return the set of record ids and names contained in a genbank file.
+
+    Used to pre-screen gb files against the requested references so that a
+    file matching *some* reference does not emit a "does not match" warning
+    when it is tried against a reference it does not contain.
+
+    :param gb_file: genbank record location
+    :return: set of record id/name strings
+    """
+    ids = set()
+    for record in SeqIO.parse(open(gb_file, "r"), "genbank"):
+        ids.add(record.id)
+        ids.add(record.name)
+    return ids
+
+
 def genbank_to_dict(gb_file, coverage_df, ref, min_cov):
     """
     parses genbank to dic and computes coverage for each annotation
@@ -220,8 +247,11 @@ def genbank_to_dict(gb_file, coverage_df, ref, min_cov):
 
     for gb_record in SeqIO.parse(open(gb_file, "r"), "genbank"):
         if gb_record.id != ref and gb_record.name != ref:
-            print('WARNING: ref id does not match genbank')
-            break
+            # keep scanning: a multi-record gb file may carry the requested
+            # ref in a later record. Whether a warning is warranted is decided
+            # by the caller (see command._load_reference) which knows the full
+            # set of requested references.
+            continue
         seq = gb_record.seq
         for feature in gb_record.features:
             if feature.type not in feature_dict:
@@ -270,6 +300,11 @@ def bed_to_dict(bed_file, coverage_df, ref, min_cov):
     :param min_cov: min coverage to consider covered
     :return: bed_dict: dictionary with all features
     """
+    # key the feature dict by the bed filename stem so that multiple bed
+    # files each get their own legend entry / legendgroup and can be
+    # toggled independently in the plot (consistent with how genbank uses
+    # feature types as keys).
+    bed_key = Path(bed_file).stem
     # first extract as list of list to be able to sort
     # (otherwise track info will be incorrect)
     bed_line_list = []
@@ -289,23 +324,23 @@ def bed_to_dict(bed_file, coverage_df, ref, min_cov):
     bed_line_list = sorted(bed_line_list, key=lambda x: x[1])
 
     # populate dictionary
-    bed_dict = {"bed annotations": {}}
+    bed_dict = {bed_key: {}}
     possible_classifiers = ["name", "score", "strand"]
     for line in bed_line_list:
         start, stop = int(line[1]), int(line[2])
-        bed_dict["bed annotations"][f"{start} {stop}"] = {}
-        bed_dict["bed annotations"][f"{start} {stop}"]["start"] = [start]
-        bed_dict["bed annotations"][f"{start} {stop}"]["stop"] = [stop]
+        bed_dict[bed_key][f"{start} {stop}"] = {}
+        bed_dict[bed_key][f"{start} {stop}"]["start"] = [start]
+        bed_dict[bed_key][f"{start} {stop}"]["stop"] = [stop]
         # always add strand dummy information in case its not in bed file
-        bed_dict["bed annotations"][f"{start} {stop}"]["strand"] = "NA"
+        bed_dict[bed_key][f"{start} {stop}"]["strand"] = "NA"
         # check for additional info
         if len(line) > 3:
             for element, classifier in zip(line[3:], possible_classifiers):
-                bed_dict["bed annotations"][f"{start} {stop}"][classifier] = element
+                bed_dict[bed_key][f"{start} {stop}"][classifier] = element
         # compute mean coverage
         mean_cov, rec = get_coverage_stats(coverage_df, start, stop, min_cov)
-        bed_dict["bed annotations"][f"{start} {stop}"]["mean coverage"] = mean_cov
-        bed_dict["bed annotations"][f"{start} {stop}"][f"% recovery >= {min_cov}x"] = rec
+        bed_dict[bed_key][f"{start} {stop}"]["mean coverage"] = mean_cov
+        bed_dict[bed_key][f"{start} {stop}"][f"% recovery >= {min_cov}x"] = rec
 
     return define_track_position(bed_dict)
 
@@ -528,7 +563,7 @@ def annotate_vcfs_in_tracks(track_data):
         # and only one gb file
         gb_indices = index_positions[0]
         if len(gb_indices) > 1:
-            print("WARNING: cannot annotate from multiple *.gb files!")
+            logger.warning("cannot annotate from multiple *.gb files!")
             return track_data
             # annotate each vcf df
         for vcf_track in index_positions[1]:

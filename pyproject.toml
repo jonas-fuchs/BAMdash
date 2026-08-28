@@ -7,20 +7,21 @@ name = 'bamdash'
 version = '0.4.5'
 description = 'Create a interactive coverage plot dashboard from bam files and add gb, vcf and bed tracks'
 keywords = ['pcr, tiled pcr, primer-tiling, qpcr, primer design']
-dependencies = ["kaleido>=0.2.1", "pandas>=1.4.4", "plotly>=5.17.0", "pysam>=0.21.0", "biopython>=1.79"]
-requires-python = '>=3.9,<3.14'
+dependencies = ["kaleido>=0.2.1", "pandas>=1.5.3", "plotly>=5.17.0", "pysam>=0.21.0", "biopython>=1.81"]
+requires-python = '>=3.11,<3.14'
 authors = [{name = 'Jonas Fuchs', email = 'jonas.fuchs@uniklinik-freiburg.de'}]
 maintainers = [{name = 'Jonas Fuchs', email = 'jonas.fuchs@uniklinik-freiburg.de'}]
 readme = 'README.md'
 license = {file = 'LICENSE'}
 classifiers = [
-    'Programming Language :: Python :: 3.9',
-    'Programming Language :: Python :: 3.10',
     'Programming Language :: Python :: 3.11',
     'Programming Language :: Python :: 3.12',
     'Programming Language :: Python :: 3.13',
     'Operating System :: OS Independent',
 ]
+
+[project.optional-dependencies]
+test = ["pytest>=7", "pytest-cov>=4"]
 
 [project.scripts]
 bamdash = "bamdash.command:main"
@@ -32,3 +33,15 @@ include-package-data = true
 where = ["."]
 include = ['bamdash*']
 namespaces = false
+
+[tool.setuptools.package-data]
+bamdash = ["scripts/templates/*.html", "scripts/config.toml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+strict_markers = true
+addopts = "-ra"
+# Make the project root importable so test modules can do
+# `from tests.conftest import ...` even in fresh CI checkouts where the
+# rootdir is not on sys.path by default (pytest >=7 supports `pythonpath`).
+pythonpath = ["."]
