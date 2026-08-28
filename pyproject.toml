@@ -7,7 +7,7 @@ name = 'bamdash'
 version = '0.4.5'
 description = 'Create a interactive coverage plot dashboard from bam files and add gb, vcf and bed tracks'
 keywords = ['pcr, tiled pcr, primer-tiling, qpcr, primer design']
-dependencies = ["kaleido>=0.2.1", "pandas>=1.4.4", "plotly>=5.17.0", "pysam>=0.21.0", "biopython>=1.79"]
+dependencies = ["kaleido>=0.2.1", "pandas>=1.5.3", "plotly>=5.17.0", "pysam>=0.21.0", "biopython>=1.81"]
 requires-python = '>=3.11,<3.14'
 authors = [{name = 'Jonas Fuchs', email = 'jonas.fuchs@uniklinik-freiburg.de'}]
 maintainers = [{name = 'Jonas Fuchs', email = 'jonas.fuchs@uniklinik-freiburg.de'}]
