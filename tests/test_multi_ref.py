@@ -1,331 +1,227 @@
 """
 Tests for the multi-reference dropdown feature.
 
-Fixtures (a synthetic 2-reference BAM, a multi-reference VCF, and a
-multi-reference BED) are generated programmatically in ``setUpClass`` so the
-suite is self-contained and does not depend on the single-reference HEV
-example data shipped in ``test/``.
+Rewritten to pytest style (functions + fixtures + plain assert). Fixtures and
+synthetic-data builders live in ``conftest.py``; these tests exercise the CLI
+end-to-end via ``bamdash.command.main`` against a synthetic 2-reference BAM,
+multi-reference VCF, and multi-reference BED, all generated programmatically
+so the suite is self-contained (no dependency on the shipped ``test/`` data).
 """
-import unittest
+from __future__ import annotations
+
+import logging
 from pathlib import Path
 
-import pysam
-from Bio import SeqIO
-from Bio.Seq import Seq
-from Bio.SeqFeature import FeatureLocation, SeqFeature
-from Bio.SeqRecord import SeqRecord
+import pytest
 
 from bamdash.command import main
+from tests.conftest import make_gb_record
 
 
-def _make_multi_ref_bam(path: Path):
-    """Create a tiny 2-reference BAM (refA=50bp, refB=30bp) with reads on both."""
-    header = {
-        "HD": {"VN": "1.6"},
-        "SQ": [{"SN": "refA", "LN": 50}, {"SN": "refB", "LN": 30}],
-    }
-    with pysam.AlignmentFile(str(path), "wb", header=header) as bam:
-        for i in range(8):
-            r = pysam.AlignedSegment()
-            r.query_name = f"readA{i}"
-            r.query_sequence = "ACGT" * 5
-            r.flag = 0
-            r.reference_id = 0
-            r.reference_start = i * 2
-            r.mapping_quality = 60
-            r.cigar = [(pysam.CMATCH, 20)]
-            r.query_qualities = pysam.qualitystring_to_array("I" * 20)
-            bam.write(r)
-        for i in range(4):
-            r = pysam.AlignedSegment()
-            r.query_name = f"readB{i}"
-            r.query_sequence = "ACGTACGTACGTACGTACGTACGTACGTAC"
-            r.flag = 0
-            r.reference_id = 1
-            r.reference_start = i * 3
-            r.mapping_quality = 60
-            r.cigar = [(pysam.CMATCH, 30)]
-            r.query_qualities = pysam.qualitystring_to_array("I" * 30)
-            bam.write(r)
-    pysam.index(str(path))
+# --------------------------------------------------------------------------- #
+# Helpers
+# --------------------------------------------------------------------------- #
+def _run(bam: Path, prefix: Path, extra_args: list[str]) -> Path:
+    args = ["-b", str(bam), "-p", str(prefix)] + list(extra_args)
+    main(args)
+    return prefix
 
 
-def _make_multi_ref_vcf(path: Path):
-    """VCF with records on both refA and refB."""
-    path.write_text(
-        "##fileformat=VCFv4.2\n"
-        "##contig=<ID=refA,length=50>\n"
-        "##contig=<ID=refB,length=30>\n"
-        '##INFO=<ID=AF,Number=1,Type=Float,Description="Allele frequency">\n'
-        "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n"
-        "refA\t5\t.\tA\tT\t.\tPASS\tAF=0.5\n"
-        "refA\t10\t.\tC\tG\t.\tPASS\tAF=0.3\n"
-        "refB\t7\t.\tG\tA\t.\tPASS\tAF=0.8\n"
-    )
+def _capture_logs() -> tuple[list[str], logging.Handler]:
+    """Attach a recording handler to the bamdash logger; return (records, handler)."""
+    records: list[str] = []
+    handler = logging.Handler()
+    handler.emit = lambda rec: records.append(rec.getMessage())
+    logger = logging.getLogger("bamdash")
+    logger.addHandler(handler)
+    return records, handler
 
 
-def _make_multi_ref_bed(path: Path):
-    """BED with records on both refA and refB."""
-    path.write_text("refA\t1\t15\tregionA1\t0\t+\nrefB\t5\t25\tregionB1\t0\t-\n")
+def _detach(handler: logging.Handler) -> None:
+    logging.getLogger("bamdash").removeHandler(handler)
 
 
-def _make_gb_record(ref_id: str, length: int, feature_type: str = "CDS") -> SeqRecord:
-    """Build a minimal genbank SeqRecord for a reference."""
-    rec = SeqRecord(Seq("A" * length), id=ref_id, name=ref_id,
-                    annotations={"molecule_type": "DNA"})
-    rec.features = [
-        SeqFeature(FeatureLocation(1, 10, strand=1), type=feature_type),
-    ]
-    return rec
-
-
-def _make_single_ref_gb(path: Path, ref_id: str, length: int):
-    """Write a genbank file containing one record for *ref_id*."""
-    SeqIO.write([_make_gb_record(ref_id, length)], str(path), "genbank")
-
-
-def _make_multi_record_gb(path: Path, specs):
-    """Write a genbank file containing one record per (ref_id, length) tuple."""
-    records = [_make_gb_record(ref_id, length) for ref_id, length in specs]
-    SeqIO.write(records, str(path), "genbank")
-
-
-class MultiRefFixture(unittest.TestCase):
-    """Shared setUp/tearDown for the multi-ref test classes."""
-
-    @classmethod
-    def setUpClass(cls):
-        cls.tmp = Path(__file__).parent / "_fixtures_tmp"
-        cls.tmp.mkdir(exist_ok=True)
-        cls.bam = cls.tmp / "multi.bam"
-        cls.vcf = cls.tmp / "multi.vcf"
-        cls.bed = cls.tmp / "multi.bed"
-        _make_multi_ref_bam(cls.bam)
-        _make_multi_ref_vcf(cls.vcf)
-        _make_multi_ref_bed(cls.bed)
-
-    @classmethod
-    def tearDownClass(cls):
-        for p in cls.tmp.glob("*"):
-            p.unlink()
-        cls.tmp.rmdir()
-
-    def _run(self, prefix: str, extra_args):
-        """Invoke the bamdash CLI in-process and return the output prefix path."""
-        out = self.tmp / prefix
-        args = ["-b", str(self.bam), "-p", str(out)] + list(extra_args)
-        main(args)
-        return out
-
-
-class TestRefIdArg(MultiRefFixture):
-    """``-r/--ref-id`` accepts zero, one, or multiple values."""
-
-    def test_no_ref_id_uses_all_references(self):
-        out = self._run("all", ["-t", str(self.vcf), str(self.bed)])
+# --------------------------------------------------------------------------- #
+# -r / --ref-id: zero, one, many
+# --------------------------------------------------------------------------- #
+class TestRefIdArg:
+    def test_no_ref_id_uses_all_references(self, two_ref_bam, two_ref_vcf, two_ref_bed, tmp_out):
+        out = _run(two_ref_bam, tmp_out, ["-t", str(two_ref_vcf), str(two_ref_bed)])
         html = Path(f"{out}.html").read_text()
-        # master HTML (>=2 refs) => dropdown with both references
-        self.assertIn("bamdash-ref-select", html)
-        self.assertIn('value="refA"', html)
-        self.assertIn('value="refB"', html)
+        assert "bamdash-ref-select" in html
+        assert 'value="refA"' in html
+        assert 'value="refB"' in html
 
-    def test_single_ref_id_produces_master_html(self):
-        out = self._run("one", ["-r", "refA", "-t", str(self.vcf), str(self.bed)])
+    def test_single_ref_id_produces_master_html(self, two_ref_bam, two_ref_vcf, two_ref_bed, tmp_out):
+        out = _run(two_ref_bam, tmp_out, ["-r", "refA", "-t", str(two_ref_vcf), str(two_ref_bed)])
         html = Path(f"{out}.html").read_text()
-        # single reference now also uses the master HTML wrapper (dropdown
-        # lists the one available reference) for consistency with multi-ref
-        self.assertIn("bamdash-ref-select", html)
-        self.assertIn('value="refA"', html)
-        self.assertNotIn('value="refB"', html)
+        # single reference also uses the master HTML wrapper (dropdown lists
+        # the one available reference) for consistency with multi-ref
+        assert "bamdash-ref-select" in html
+        assert 'value="refA"' in html
+        assert 'value="refB"' not in html
 
-    def test_multiple_ref_ids_produce_master_html(self):
-        out = self._run("two", ["-r", "refB", "refA", "-t", str(self.vcf), str(self.bed)])
+    def test_multiple_ref_ids_preserve_user_order(self, two_ref_bam, two_ref_vcf, two_ref_bed, tmp_out):
+        out = _run(two_ref_bam, tmp_out, ["-r", "refB", "refA", "-t", str(two_ref_vcf), str(two_ref_bed)])
         html = Path(f"{out}.html").read_text()
-        self.assertIn("bamdash-ref-select", html)
+        assert "bamdash-ref-select" in html
         # order follows the user-supplied order
-        self.assertLess(html.index('value="refB"'), html.index('value="refA"'))
+        assert html.index('value="refB"') < html.index('value="refA"')
 
 
-class TestGenbankTracks(MultiRefFixture):
-    """GenBank track handling across multiple references."""
-
-    def test_one_gb_per_reference_all_matched(self):
-        """One .gb file per reference: every reference gets its features."""
-        gbA = self.tmp / "refA.gb"
-        gbB = self.tmp / "refB.gb"
-        _make_single_ref_gb(gbA, "refA", 50)
-        _make_single_ref_gb(gbB, "refB", 30)
-        out = self._run("gb_per_ref", ["-t", str(gbA), str(gbB)])
+# --------------------------------------------------------------------------- #
+# GenBank track handling across references
+# --------------------------------------------------------------------------- #
+class TestGenbankTracks:
+    def test_one_gb_per_reference_all_matched(self, two_ref_bam, make_gb_path):
+        gbA = make_gb_path([make_gb_record("refA", 50, features=[{"type": "CDS", "location": [(1, 10, 1)]}])], "refA.gb")
+        gbB = make_gb_path([make_gb_record("refB", 30, features=[{"type": "CDS", "location": [(1, 10, 1)]}])], "refB.gb")
+        out = _run(two_ref_bam, gbA.parent / "out", ["-t", str(gbA), str(gbB)])
         html = Path(f"{out}.html").read_text()
-        # both panels present with genbank feature annotations
-        self.assertIn('id="plot-refA"', html)
-        self.assertIn('id="plot-refB"', html)
-        self.assertIn("CDS", html)
+        assert 'id="plot-refA"' in html
+        assert 'id="plot-refB"' in html
+        assert "CDS" in html
 
-    def test_single_multi_record_gb_all_matched(self):
+    def test_single_multi_record_gb_all_matched(self, two_ref_bam, make_gb_path):
         """A single .gb file with both references: both refs get features.
 
         Regression for the ``break`` bug in ``genbank_to_dict`` that stopped
         scanning at the first non-matching record, so only the first reference
         in a multi-record file was ever found.
         """
-        multi_gb = self.tmp / "multi.gb"
-        _make_multi_record_gb(multi_gb, [("refA", 50), ("refB", 30)])
-        out = self._run("gb_multi_rec", ["-t", str(multi_gb)])
+        multi_gb = make_gb_path(
+            [
+                make_gb_record("refA", 50, features=[{"type": "CDS", "location": [(1, 10, 1)]}]),
+                make_gb_record("refB", 30, features=[{"type": "CDS", "location": [(1, 10, 1)]}]),
+            ],
+            "multi.gb",
+        )
+        out = _run(two_ref_bam, multi_gb.parent / "out", ["-t", str(multi_gb)])
         html = Path(f"{out}.html").read_text()
-        self.assertIn('id="plot-refA"', html)
-        self.assertIn('id="plot-refB"', html)
-        self.assertIn("CDS", html)
+        assert 'id="plot-refA"' in html
+        assert 'id="plot-refB"' in html
+        assert "CDS" in html
 
-    def test_non_matching_gb_warns_once(self):
-        """A .gb file matching none of the requested refs warns exactly once."""
-        gbX = self.tmp / "refX.gb"
-        _make_single_ref_gb(gbX, "refX", 40)
-        import logging
-        records = []
-        handler = logging.Handler()
-        handler.emit = lambda rec: records.append(rec.getMessage())
-        logger = logging.getLogger("bamdash")
-        logger.addHandler(handler)
+    def test_non_matching_gb_warns_once(self, two_ref_bam, make_gb_path, tmp_out):
+        gbX = make_gb_path([make_gb_record("refX", 40)], "refX.gb")
+        records, handler = _capture_logs()
         try:
-            out = self._run("gb_nomatch", ["-t", str(gbX)])
+            _run(two_ref_bam, tmp_out, ["-t", str(gbX)])
         finally:
-            logger.removeHandler(handler)
-        # exactly one warning mentioning the non-matching file
+            _detach(handler)
         gb_warnings = [m for m in records if "refX.gb" in m]
-        self.assertEqual(len(gb_warnings), 1)
+        assert len(gb_warnings) == 1
 
-    def test_matching_gb_no_warning(self):
-        """A .gb file matching a requested ref produces no gb warning."""
-        gbA = self.tmp / "refA.gb"
-        _make_single_ref_gb(gbA, "refA", 50)
-        import logging
-        records = []
-        handler = logging.Handler()
-        handler.emit = lambda rec: records.append(rec.getMessage())
-        logger = logging.getLogger("bamdash")
-        logger.addHandler(handler)
+    def test_matching_gb_no_warning(self, two_ref_bam, make_gb_path, tmp_out):
+        gbA = make_gb_path([make_gb_record("refA", 50)], "refA.gb")
+        records, handler = _capture_logs()
         try:
-            self._run("gb_match", ["-r", "refA", "-t", str(gbA)])
+            _run(two_ref_bam, tmp_out, ["-r", "refA", "-t", str(gbA)])
         finally:
-            logger.removeHandler(handler)
-        gb_warnings = [m for m in records if "does not contain" in m]
-        self.assertEqual(gb_warnings, [])
+            _detach(handler)
+        assert [m for m in records if "does not contain" in m] == []
 
 
-class TestInvalidRef(MultiRefFixture):
-    """An unknown reference id exits non-zero with a clear error."""
+# --------------------------------------------------------------------------- #
+# Invalid reference id
+# --------------------------------------------------------------------------- #
+class TestInvalidRef:
+    def test_invalid_ref_id_exits_nonzero(self, two_ref_bam, tmp_out):
+        with pytest.raises(SystemExit) as exc:
+            main(["-b", str(two_ref_bam), "-r", "NOPE", "-p", str(tmp_out)])
+        assert exc.value.code == 1
 
-    def test_invalid_ref_id_exits_nonzero(self):
-        out = self.tmp / "bad"
-        with self.assertRaises(SystemExit) as ctx:
-            main(["-b", str(self.bam), "-r", "NOPE", "-p", str(out)])
-        self.assertEqual(ctx.exception.code, 1)
 
+# --------------------------------------------------------------------------- #
+# Static image export
+# --------------------------------------------------------------------------- #
+class TestStaticExport:
+    def test_multi_ref_static_one_image_per_reference(self, two_ref_bam, two_ref_vcf, two_ref_bed, tmp_out):
+        out = _run(two_ref_bam, tmp_out, ["-t", str(two_ref_vcf), str(two_ref_bed), "--suffix", "png"])
+        assert Path(f"{out}_refA.png").exists()
+        assert Path(f"{out}_refB.png").exists()
 
-class TestStaticExport(MultiRefFixture):
-    """Static image export writes one file per reference when multi-ref."""
-
-    def test_multi_ref_static_one_image_per_reference(self):
-        out = self._run("static", ["-t", str(self.vcf), str(self.bed), "--suffix", "png"])
-        self.assertTrue(Path(f"{out}_refA.png").exists())
-        self.assertTrue(Path(f"{out}_refB.png").exists())
-
-    def test_single_ref_static_uses_plain_name(self):
-        out = self._run("static1", ["-r", "refA", "-t", str(self.vcf), str(self.bed), "--suffix", "png"])
+    def test_single_ref_static_uses_plain_name(self, two_ref_bam, two_ref_vcf, two_ref_bed, tmp_out):
+        out = _run(two_ref_bam, tmp_out, ["-r", "refA", "-t", str(two_ref_vcf), str(two_ref_bed), "--suffix", "png"])
         # single ref => no ref token in the filename (backward compatible)
-        self.assertTrue(Path(f"{out}.png").exists())
-        self.assertFalse(Path(f"{out}_refA.png").exists())
+        assert Path(f"{out}.png").exists()
+        assert not Path(f"{out}_refA.png").exists()
 
 
-class TestMultiRefRecordSplit(MultiRefFixture):
-    """A multi-reference VCF/BED is split per reference in the dump output."""
-
-    def test_vcf_records_split_per_reference(self):
-        out = self._run("split", ["-t", str(self.vcf), str(self.bed), "--dump"])
+# --------------------------------------------------------------------------- #
+# Per-reference record split in dump output
+# --------------------------------------------------------------------------- #
+class TestMultiRefRecordSplit:
+    def test_vcf_records_split_per_reference(self, two_ref_bam, two_ref_vcf, two_ref_bed, tmp_out):
+        out = _run(two_ref_bam, tmp_out, ["-t", str(two_ref_vcf), str(two_ref_bed), "--dump"])
         refA_vcf = Path(f"{out}_refA_vcf_data_0.tabular").read_text()
         refB_vcf = Path(f"{out}_refB_vcf_data_0.tabular").read_text()
         # refA has two variants (positions 5 and 10); refB has one (position 7)
-        self.assertIn("5\tA\tT", refA_vcf)
-        self.assertIn("10\tC\tG", refA_vcf)
-        self.assertNotIn("7\tG\tA", refA_vcf)
-        self.assertIn("7\tG\tA", refB_vcf)
-        self.assertNotIn("5\tA\tT", refB_vcf)
+        assert "5\tA\tT" in refA_vcf
+        assert "10\tC\tG" in refA_vcf
+        assert "7\tG\tA" not in refA_vcf
+        assert "7\tG\tA" in refB_vcf
+        assert "5\tA\tT" not in refB_vcf
 
-    def test_bed_records_split_per_reference(self):
-        out = self._run("splitbed", ["-t", str(self.vcf), str(self.bed), "--dump"])
+    def test_bed_records_split_per_reference(self, two_ref_bam, two_ref_vcf, two_ref_bed, tmp_out):
+        out = _run(two_ref_bam, tmp_out, ["-t", str(two_ref_vcf), str(two_ref_bed), "--dump"])
         refA_bed = Path(f"{out}_refA_bed_data_0.tabular").read_text()
         refB_bed = Path(f"{out}_refB_bed_data_0.tabular").read_text()
-        self.assertIn("regionA1", refA_bed)
-        self.assertNotIn("regionB1", refA_bed)
-        self.assertIn("regionB1", refB_bed)
-        self.assertNotIn("regionA1", refB_bed)
+        assert "regionA1" in refA_bed
+        assert "regionB1" not in refA_bed
+        assert "regionB1" in refB_bed
+        assert "regionA1" not in refB_bed
 
-    def test_single_ref_dump_uses_plain_names(self):
-        out = self._run("dump1", ["-r", "refA", "-t", str(self.vcf), str(self.bed), "--dump"])
+    def test_single_ref_dump_uses_plain_names(self, two_ref_bam, two_ref_vcf, two_ref_bed, tmp_out):
+        out = _run(two_ref_bam, tmp_out, ["-r", "refA", "-t", str(two_ref_vcf), str(two_ref_bed), "--dump"])
         # single ref => no ref token in sidecar names (backward compatible)
-        self.assertTrue(Path(f"{out}_bam_stats.tabular").exists())
-        self.assertTrue(Path(f"{out}_vcf_data_0.tabular").exists())
-        self.assertFalse(Path(f"{out}_refA_bam_stats.tabular").exists())
+        assert Path(f"{out}_bam_stats.tabular").exists()
+        assert Path(f"{out}_vcf_data_0.tabular").exists()
+        assert not Path(f"{out}_refA_bam_stats.tabular").exists()
 
 
-class TestMasterHtmlStructure(MultiRefFixture):
-    """The master HTML contains one panel per reference and inlined plotly.js."""
-
-    def test_master_html_has_panels_and_inlined_plotly(self):
-        out = self._run("struct", ["-t", str(self.vcf), str(self.bed)])
+# --------------------------------------------------------------------------- #
+# Master HTML structure
+# --------------------------------------------------------------------------- #
+class TestMasterHtmlStructure:
+    def test_master_html_has_panels_and_inlined_plotly(self, two_ref_bam, two_ref_vcf, two_ref_bed, tmp_out):
+        out = _run(two_ref_bam, tmp_out, ["-t", str(two_ref_vcf), str(two_ref_bed)])
         html = Path(f"{out}.html").read_text()
         # two ref-panel divs, first one active
-        self.assertIn('id="plot-refA" class="ref-panel active"', html)
-        self.assertIn('id="plot-refB" class="ref-panel"', html)
+        assert 'id="plot-refA" class="ref-panel active"' in html
+        assert 'id="plot-refB" class="ref-panel"' in html
         # plotly.js is inlined (offline-capable)
-        self.assertIn("Plotly.newPlot", html)
+        assert "Plotly.newPlot" in html
         # no CDN script src (offline)
-        self.assertNotIn('src="https://cdn', html)
+        assert 'src="https://cdn' not in html
 
-    def test_master_html_has_no_dark_mode(self):
+    def test_master_html_has_no_dark_mode(self, two_ref_bam, two_ref_vcf, two_ref_bed, tmp_out):
         """Dark mode and its button were removed from the master HTML."""
-        out = self._run("nodark", ["-t", str(self.vcf), str(self.bed)])
+        import re
+        out = _run(two_ref_bam, tmp_out, ["-t", str(two_ref_vcf), str(two_ref_bed)])
         html = Path(f"{out}.html").read_text()
         # no dark template registration
-        self.assertNotIn("plotly_dark_custom", html)
+        assert "plotly_dark_custom" not in html
         # no per-figure updatemenu buttons in the figure layout JSON. The
         # plotly.js bundle itself contains the string "updatemenus" (it is
         # a plotly component name), so check the per-figure Plotly.newPlot
         # layout payload instead, which is where our buttons would live.
-        import re
-        layouts = re.findall(r'"updatemenus":\s*\[', html)
-        self.assertEqual(layouts, [], "no per-figure updatemenu buttons should be present")
-        self.assertNotIn('>dark<', html)
+        assert re.findall(r'"updatemenus":\s*\[', html) == []
+        assert ">dark<" not in html
 
-    def test_master_html_has_global_log_linear_toggle(self):
+    def test_master_html_has_global_log_linear_toggle(self, two_ref_bam, two_ref_vcf, two_ref_bed, tmp_out):
         """The master HTML has a global log/linear toggle next to the dropdown."""
-        out = self._run("toggle", ["-t", str(self.vcf), str(self.bed)])
+        out = _run(two_ref_bam, tmp_out, ["-t", str(two_ref_vcf), str(two_ref_bed)])
         html = Path(f"{out}.html").read_text()
-        # the toggle button exists
-        self.assertIn('id="bamdash-scale-toggle"', html)
-        # per-reference axis ranges are injected for the toggle JS
-        self.assertIn("bamdashAxisRanges", html)
-        self.assertIn('"linear"', html)
-        self.assertIn('"log"', html)
-        # the applyScale helper relayouts every panel
-        self.assertIn("applyScale", html)
+        assert 'id="bamdash-scale-toggle"' in html
+        assert "bamdashAxisRanges" in html
+        assert '"linear"' in html
+        assert '"log"' in html
+        assert "applyScale" in html
 
-    def test_single_ref_html_uses_master_with_toggle(self):
+    def test_single_ref_html_uses_master_with_toggle(self, two_ref_bam, two_ref_vcf, two_ref_bed, tmp_out):
         """Single-reference output is the master HTML with the global toggle."""
-        out = self._run("onebtn", ["-r", "refA", "-t", str(self.vcf), str(self.bed)])
+        out = _run(two_ref_bam, tmp_out, ["-r", "refA", "-t", str(two_ref_vcf), str(two_ref_bed)])
         html = Path(f"{out}.html").read_text()
-        # single ref also uses the master wrapper with the global toggle
-        self.assertIn("bamdash-ref-select", html)
-        self.assertIn('id="bamdash-scale-toggle"', html)
-        # no per-figure updatemenu buttons in the figure layout JSON
-        import re
-        layouts = re.findall(r'"updatemenus":\s*\[', html)
-        self.assertEqual(layouts, [], "no per-figure updatemenu buttons should be present")
-        # no dark button
-        self.assertNotIn("plotly_dark_custom", html)
-        self.assertNotIn('>dark<', html)
-
-
-if __name__ == "__main__":
-    unittest.main()
+        assert "bamdash-ref-select" in html
+        assert 'id="bamdash-scale-toggle"' in html

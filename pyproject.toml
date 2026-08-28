@@ -9,6 +9,9 @@ description = 'Create a interactive coverage plot dashboard from bam files and a
 keywords = ['pcr, tiled pcr, primer-tiling, qpcr, primer design']
 dependencies = ["kaleido>=0.2.1", "pandas>=1.4.4", "plotly>=5.17.0", "pysam>=0.21.0", "biopython>=1.79"]
 requires-python = '>=3.9,<3.14'
+
+[project.optional-dependencies]
+test = ["pytest>=7", "pytest-cov>=4"]
 authors = [{name = 'Jonas Fuchs', email = 'jonas.fuchs@uniklinik-freiburg.de'}]
 maintainers = [{name = 'Jonas Fuchs', email = 'jonas.fuchs@uniklinik-freiburg.de'}]
 readme = 'README.md'
@@ -35,3 +38,8 @@ namespaces = false
 
 [tool.setuptools.package-data]
 bamdash = ["scripts/templates/*.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+strict_markers = true
+addopts = "-ra"
