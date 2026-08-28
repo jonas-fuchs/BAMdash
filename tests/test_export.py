@@ -308,3 +308,46 @@ class TestCliErrors:
         assert exc.value.code == 0
         captured = capsys.readouterr()
         assert "bamdash" in captured.out
+
+
+# --------------------------------------------------------------------------- #
+# bam index auto-creation
+# --------------------------------------------------------------------------- #
+class TestBamIndex:
+    def test_index_created_when_missing(self, two_ref_bam, tmp_out):
+        """bamdash creates the .bai if it is missing before opening the bam."""
+        from bamdash.command import _ensure_bam_index
+        index = Path(f"{two_ref_bam}.bai")
+        assert index.exists()  # created by make_bam fixture
+        index.unlink()  # remove it
+        assert not index.exists()
+        # running bamdash recreates the index
+        _run(two_ref_bam, tmp_out, [])
+        assert index.exists()
+
+    def test_ensure_bam_index_creates_missing(self, two_ref_bam):
+        from bamdash.command import _ensure_bam_index
+        index = Path(f"{two_ref_bam}.bai")
+        index.unlink()
+        assert not index.exists()
+        ret = _ensure_bam_index(str(two_ref_bam))
+        assert index.exists()
+        # returns the index path
+        assert Path(ret) == index
+
+    def test_ensure_bam_index_noop_when_present(self, two_ref_bam):
+        from bamdash.command import _ensure_bam_index
+        index = Path(f"{two_ref_bam}.bai")
+        assert index.exists()
+        mtime_before = index.stat().st_mtime_ns
+        ret = _ensure_bam_index(str(two_ref_bam))
+        # existing index is not touched
+        assert index.stat().st_mtime_ns == mtime_before
+        assert Path(ret) == index
+
+    def test_missing_bam_file_exits(self, tmp_path, tmp_out):
+        """A non-existent bam path is reported and exits non-zero."""
+        bogus = tmp_path / "does_not_exist.bam"
+        with pytest.raises(SystemExit) as exc:
+            main(["-b", str(bogus), "-p", str(tmp_out)])
+        assert exc.value.code == 1

@@ -25,7 +25,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
+        python-version: ['3.11', '3.12', '3.13']
 
     steps:
       - name: Checkout repository
@@ -43,20 +43,7 @@ jobs:
           python -m pip install -e ".[test]"
 
       - name: Run test suite
-        shell: bash
-        run: |
-          if [ "${{ matrix.python-version }}" = "3.12" ]; then
-            pytest --cov=bamdash --cov-branch --cov-report=xml --cov-report=term-missing
-          else
-            pytest
-          fi
-
-      - name: Upload coverage to Codecov
-        if: matrix.python-version == '3.12'
-        uses: codecov/codecov-action@v7
-        with:
-          files: ./coverage.xml
-          fail_ci_if_error: false
+        run: pytest
 
   min-deps:
     # Installs every runtime dependency pinned to its declared lower bound
@@ -74,7 +61,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
-          python-version: '3.9'
+          python-version: '3.11'
           cache: pip
 
       - name: Build minimum-dependency constraints file

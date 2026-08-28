@@ -8,6 +8,7 @@ import argparse
 import copy
 import json
 import logging
+import os
 import sys
 
 # LIBS
@@ -115,6 +116,15 @@ def get_args(sysargs):
              "to view"
     )
     parser.add_argument(
+        "--custom-config",
+        default=None,
+        type=str,
+        metavar="TOML",
+        help="path to a user-supplied TOML config file whose settings override "
+             "the shipped defaults (see config.toml). Only the keys present in "
+             "the file are overwritten; all others keep their default values"
+    )
+    parser.add_argument(
         "-d",
         "--dimensions",
         type=int,
@@ -169,6 +179,36 @@ def get_args(sysargs):
     if args.dimensions is None:
         args.dimensions = [1920, 1080]
     return args
+
+
+def _ensure_bam_index(bam_path):
+    """
+    Create the bam index (``.bai``) if it is missing.
+
+    pysam requires an index for the ``count_coverage`` / ``get_index_statistics``
+    calls bamdash relies on. ``pysam.index`` builds it via samtools when no
+    matching ``.bai`` exists next to the bam file.
+
+    :param bam_path: path to the ``.bam`` file
+    :raises FileNotFoundError: if the bam file itself does not exist
+    :return: path to the index file that is now guaranteed to exist
+    """
+    if not os.path.isfile(bam_path):
+        # let the downstream AlignmentFile open raise the canonical error; but
+        # give a clear message first since pysam's message can be cryptic.
+        raise FileNotFoundError(f"bam file not found: {bam_path}")
+
+    # the canonical index path is the bam path with a trailing ".bai"
+    index_path = bam_path + ".bai"
+    if os.path.isfile(index_path):
+        return index_path
+
+    logger.info("no bam index found, creating %s", index_path)
+    # pysam.index returns the index path on success; building the index in
+    # place (no explicit output path) writes bam_path + ".bai".
+    ret = pysam.index(bam_path)
+    # older pysam versions return the path; newer ones return None on success
+    return ret or index_path
 
 
 def _load_reference(args, ref, refs, warned_no_match=None):
@@ -287,6 +327,22 @@ def main(sysargs=sys.argv[1:]):
     """
     # parse args
     args = get_args(sysargs)
+
+    # apply the (possibly user-overridden) plotting config before any
+    # plotting code runs. Unknown keys or a missing custom file are errors.
+    if args.custom_config is not None:
+        try:
+            config.load_config(args.custom_config)
+        except (FileNotFoundError, KeyError) as exc:
+            logger.error("%s", exc)
+            sys.exit(1)
+
+    # ensure the bam index exists; pysam needs it for coverage/index stats
+    try:
+        _ensure_bam_index(args.bam)
+    except FileNotFoundError as exc:
+        logger.error("%s", exc)
+        sys.exit(1)
 
     # resolve reference ids: default to all references in the bam header
     with pysam.AlignmentFile(args.bam, "rb") as bam:

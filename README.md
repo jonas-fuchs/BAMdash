@@ -115,6 +115,10 @@ full usage:
                         connection (default: True). Use --no-offline to load
                         plotly.js from a CDN instead, which produces a much
                         smaller html file but requires internet access to view
+  --custom-config TOML  path to a user-supplied TOML config file whose
+                        settings override the shipped defaults (see
+                        config.toml). Only the keys present in the file are
+                        overwritten; all others keep their default values
   -d px px, --dimensions px px
                         width and height of static (non-html) output in px
                         (default: 1920 1080; ignored when only html is
@@ -165,61 +169,37 @@ The master `html` inlines the plotly.js bundle once, so it is fully usable
 offline.
 
 
-## Cutomization
+## Customization
 
-BAMcov plotting settings can be adjusted in in the `config.py`. Therefore, you have to clone this repo.
+BAMdash plotting settings are defined in a TOML config file. The shipped
+defaults live in [`bamdash/scripts/config.toml`](bamdash/scripts/config.toml).
+You can override individual settings without modifying the package by supplying
+your own TOML file via `--custom-config`. Only the keys present in your file
+are overwritten; all others keep their default values.
 
-Go to the configs location:
+1. Copy the shipped `config.toml` and adjust the values you want to change:
+
 ```shell
-cd BAMdash/bamdash/scripts/
+cp bamdash/scripts/config.toml my_config.toml
+$EDITOR my_config.toml
 ```
-And open the `config.py` with a text editor, e.g.:
+
+```toml
+# example: only override coverage colors and the SNP marker color
+coverage_fill_color = "rgba(0, 100, 200, 0.3)"
+coverage_line_color = "rgba(0, 100, 200, 1)"
+snp_color = "purple"
+```
+
+2. Run bamdash with `--custom-config`:
+
 ```shell
-gedit config.py
+bamdash -b HEV.bam -r HEV-pat-1 -t HEV.vcf --custom-config my_config.toml
 ```
-and adjust the settings:
-```python
-# pdf settings
-show_log = True
 
-# overall layout
-vcf_track_proportion = 0.3
-gb_track_proportion = 0.5
-bed_track_proportion = 0.2
-plot_spacing = 0.05
-
-# coverage customize
-coverage_fill_color = "rgba(255, 212, 135, 0.2)"
-coverage_line_color = "rgba(224, 168, 68, 1)"
-average_line_color = "grey"
-average_line_width = 1
-
-# track customize
-track_color_scheme = "agsunset"  # for mutiple annotations tracks (genebank)
-track_color_single = "rgb(145, 145, 145)"  # for single tracks (any rgb value, but no named colors)
-strand_types = ["triangle-right", "triangle-left", "diamond-wide"]  # +, -, undefined strand
-strand_marker_size = 8
-strand_marker_line_width = 1
-strand_marker_line_color = "rgba(0, 0, 0, 0.2)"
-box_bed_alpha = [0.6, 0.6]  # alpha values for boxes (bed)
-box_bed_size = [0.4, 0.4]  # size values for boxes (bed)
-box_gb_alpha = [0.6, 0.8]  # alpha values for boxes (gb)
-box_gb_size = [0.4, 0.3]  # size values for boxes (gb)
-
-# variant customize
-variant_marker_size = 13
-variant_marker_line_width = 1
-variant_line_color = "black"
-stem_color = "grey"
-stem_width = 1
-snp_color = "grey"
-ins_color = "blue"
-del_color = "red"
-```
-To apply these new settings just repeat the installation procedure in the BAMdash dir:
-```shell
-pip install .
-```
+All available settings and their default values are documented in the shipped
+[`config.toml`](bamdash/scripts/config.toml). Unknown keys are rejected with an
+error so typos do not get silently ignored.
 
 ---
 
