@@ -192,8 +192,11 @@ class TestMasterHtmlStructure:
         assert 'id="plot-refB" class="ref-panel"' in html
         # plotly.js is inlined (offline-capable)
         assert "Plotly.newPlot" in html
-        # no CDN script src (offline)
-        assert 'src="https://cdn' not in html
+        # no CDN <script> tag of our own (offline). NB: the inlined plotly.js
+        # bundle itself contains `src="https://cdn.jsdelivr.net/..."` (mapbox
+        # icon refs), so checking the bare substring is flaky across plotly
+        # versions; assert on the exact CDN script tag html.py emits instead.
+        assert '<script src="https://cdn.plot.ly/plotly-' not in html
 
     def test_master_html_has_no_dark_mode(self, two_ref_bam, two_ref_vcf, two_ref_bed, tmp_out):
         """Dark mode and its button were removed from the master HTML."""
@@ -236,7 +239,9 @@ class TestOfflineOnlineArg:
         html = Path(f"{out}.html").read_text()
         # the plotly.js bundle is inlined in a <script> block (no src)
         assert "Plotly.newPlot" in html
-        assert 'src="https://cdn' not in html
+        # no CDN <script> tag of our own (see TestMasterHtmlStructure note:
+        # the inlined bundle contains its own mapbox CDN string references).
+        assert '<script src="https://cdn.plot.ly/plotly-' not in html
         # the inlined bundle is large (~3MB); a CDN-free offline file is big
         assert len(html) > 1_000_000
 
@@ -258,7 +263,9 @@ class TestOfflineOnlineArg:
         """Without --offline/--no-offline, the plotly bundle is inlined."""
         out = _run(two_ref_bam, tmp_out, [])
         html = Path(f"{out}.html").read_text()
-        assert 'src="https://cdn' not in html
+        # no CDN <script> tag of our own (inlined bundle has its own mapbox
+        # CDN string refs, so check the exact tag html.py emits).
+        assert '<script src="https://cdn.plot.ly/plotly-' not in html
         assert len(html) > 1_000_000
 
     def test_no_doubled_script_tags(self, two_ref_bam, tmp_out):
