@@ -9,8 +9,8 @@
 show_log = true
 
 # overall layout
-vcf_track_proportion = 0.3
-gb_track_proportion = 0.5
+vcf_track_proportion = 0.4
+gb_track_proportion = 0.3
 bed_track_proportion = 0.2
 plot_spacing = 0.05
 font = "Arial"
@@ -35,7 +35,7 @@ box_gb_alpha = [0.7, 0.8]    # alpha values for boxes (gb)
 box_gb_size = [0.4, 0.3]     # size values for boxes (gb)
 
 # variant customize
-variant_marker_size = 10
+variant_marker_size = 7
 variant_marker_line_width = 1
 variant_line_color = "black"
 stem_color = "grey"

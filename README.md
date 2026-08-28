@@ -1,10 +1,10 @@
 
 <img src="./bamdash.png" alt="bamdash" />
 
-[![language](https://img.shields.io/badge/python-%3E3.9-green)](https://www.python.org/)
+[![language](https://img.shields.io/badge/python-%3E3.11-green)](https://www.python.org/)
 [![License: GPL v3](https://img.shields.io/github/license/jonas-fuchs/bamdash)](https://www.gnu.org/licenses/gpl-3.0)
 ![Static Badge](https://img.shields.io/badge/platform-linux_osx-blue)
-[![DOI](https://zenodo.org/badge/700952196.svg)](https://zenodo.org/badge/latestdoi/700952196)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17913086.svg)](https://zenodo.org/records/17913086)
 [![PiPy](https://img.shields.io/pypi/v/bamdash?label=pypi%20version)](https://pypi.org/project/bamdash/)
 [![Downloads](https://static.pepy.tech/badge/bamdash)](https://pypi.org/project/bamdash/)
 [![CONDA](https://img.shields.io/conda/v/bioconda/bamdash?label=conda%20version)](https://anaconda.org/bioconda/bamdash)
@@ -14,14 +14,13 @@
 
 **BAMdash lets you create interactive coverage plots from your bam file with [`plotly`](https://plotly.com/)**
 
-- **requires** only a `.bam`, `.bai` and the reference id(s) to which the reads where mapped
+- **requires** only a `.bam`
 - **create** a interactive `html` for data exploration
 - **create** a static image (`jpg`, `png`, `pdf`, `svg`) ready for publication
 - **add** additional tracks (supported: `.vcf`, `.gb`, `.bed`)
 - **plot** multiple references in a single `html` with a dropdown to switch between them
 - **annotate** tracks with additional information
 - **export** annoated track data as tabular files (`.bed`, `.vcf`) or json (`.gb`)
-- **developed** for viral genomics
 - **customize** all plotting parameters
 
 **Feel free to report any bugs or request new features as issues!**

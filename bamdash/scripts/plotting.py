@@ -250,36 +250,53 @@ def split_vcf_df(df):
         return [df]
 
 
-def adjust_array_min_distance(values: list, min_distance: float, max_values, max_iterations: int = 100) -> list:
+def adjust_array_min_distance(
+    values: list[float],
+    min_distance: float,
+    max_iterations: int = 1000,
+    tolerance: float = 1e-6,
+) -> list[float]:
     """
-    Adjust values in a 1D array to maintain a minimum distance while staying close to their original values.
+    Adjust 1D values to keep a minimum distance with minimal deviation.
 
-    :param values: List of values to adjust
-    :param min_distance: The required minimum distance between values.
-    :param max_values: boundaries
-    :param max_iterations: Maximum number of iterations for convergence.
+    Ported from ResistanceProfiler's implementation: an iterative algorithm
+    that walks *sorted* values and separates neighbouring entries when they
+    are closer than ``min_distance``. The array is re-sorted every iteration
+    because value mutations from previous passes can change the ordering.
+    Convergence is detected when the largest per-iteration adjustment falls
+    below ``tolerance``.
 
-    :return: Adjusted values ensuring the minimum distance and minimal deviation.
+    :param values: values to adjust
+    :param min_distance: required minimum distance between neighbouring values
+    :param max_iterations: upper bound on refinement iterations
+    :param tolerance: convergence threshold for the max per-iteration adjustment
+    :return: adjusted values with the same ordering as the input
     """
+    arr = list(values)
+    n = len(arr)
+    if n == 0:
+        return []
+    if n == 1:
+        return [float(arr[0])]
+
     for _ in range(max_iterations):
-        for i in range(1, len(values)):
-            idx1, idx2 = i-1, i
-            if values[idx2] - values[idx1] < min_distance:
-                # Calculate the midpoint for adjustment
-                adjustment = (min_distance - (values[idx2] - values[idx1])) / 2
-                # Adjust values to separate while minimizing deviation
-                if values[idx1] - adjustment >= 0-max_values[0]/50:  # outside boundaries?
-                    values[idx1] -= adjustment
-                else:
-                    values[idx1] = 0 - max_values[0] / 100  # half way to boundary
+        # re-sort each iteration: value mutations from previous passes change
+        # the ordering, so the neighbour pairs to check change too.
+        sorted_indices = sorted(range(n), key=lambda i: arr[i])
+        max_adjustment = 0.0
+        for i in range(1, n):
+            idx1 = sorted_indices[i - 1]
+            idx2 = sorted_indices[i]
+            gap = arr[idx2] - arr[idx1]
+            if gap < min_distance - tolerance:
+                push = (min_distance - gap) / 2.0
+                arr[idx1] -= push
+                arr[idx2] += push
+                max_adjustment = max(max_adjustment, push)
+        if max_adjustment < tolerance:
+            break
 
-                if values[idx2] + adjustment <= max_values[1]:
-                    values[idx2] += adjustment
-                else:
-                    values[idx2] = max_values[1] + max_values[1] / 100
-
-
-    return values
+    return [float(v) for v in arr]
 
 
 def create_vcf_plot(fig, row, vcf_df):
@@ -300,14 +317,27 @@ def create_vcf_plot(fig, row, vcf_df):
             if x_values is not None:
                 max_x = max(x_values)
 
-    # adjust the min distance based on number of variant thresholds
-    for var_n, divider in zip([5, 25, 100, 500], [100, 25, 5, 1]):
-        if var_n < len(vcf_df["position"]) and var_n != 500:
-            continue
-        min_distance = max_x / len(vcf_df["position"]) / divider
-        break
-    # jitter vcf positions
-    vcf_df["position_jittered"] = adjust_array_min_distance(list(vcf_df["position"]), min_distance=min_distance, max_values=[0, max_x])
+    # Jitter the top-dot x positions so overlapping variants are dispersed.
+    # Ported from ResistanceProfiler's _apply_top_jitter: sort by (position,
+    # allele frequency) so ties break deterministically, then enforce a minimum
+    # separation of max_x / 200 — the same 1/200-of-the-visible-range ratio the
+    # reference uses (feature_length / 200), scaled to the coverage x-axis. The
+    # stem stays anchored at the true genomic position; only the top dot shifts.
+    sorted_indices = sorted(
+        range(len(vcf_df)),
+        key=lambda i: (vcf_df["position"].iloc[i],
+                       vcf_df["AF"].iloc[i] if "AF" in vcf_df else 0),
+    )
+    sorted_positions = [vcf_df["position"].iloc[i] for i in sorted_indices]
+    min_distance = max_x / 200
+    jittered_sorted = adjust_array_min_distance(
+        sorted_positions, min_distance=min_distance)
+
+    # scatter back into original row order
+    jittered = [0.0] * len(vcf_df)
+    for orig_idx, jit_x in zip(sorted_indices, jittered_sorted):
+        jittered[orig_idx] = jit_x
+    vcf_df["position_jittered"] = jittered
 
     # add stem independent of upper layers
     if "AF" in vcf_df:

@@ -255,3 +255,13 @@ class TestOfflineOnlineArg:
         html = Path(f"{out}.html").read_text()
         assert 'src="https://cdn' not in html
         assert len(html) > 1_000_000
+
+    def test_no_doubled_script_tags(self, two_ref_bam, tmp_out):
+        """Regression: html.py wrapped plotly_js in <script> AND the template
+        wrapped $plotly_js in <script>, producing <script><script>... which
+        breaks the plotly bundle so no figure renders."""
+        for args in ([], ["--no-offline"]):
+            out = _run(two_ref_bam, tmp_out, args)
+            html = Path(f"{out}.html").read_text()
+            assert "<script><script>" not in html
+            assert "</script></script>" not in html

@@ -54,38 +54,41 @@ def _fig_and_payload(bam, prefix, extra_args, ref="refA", div_id=None):
 # --------------------------------------------------------------------------- #
 class TestAdjustArrayMinDistance:
     def test_output_is_non_decreasing(self):
-        out = plotting.adjust_array_min_distance([1, 1.1, 1.2, 5], min_distance=1.0,
-                                                 max_values=[0, 10])
+        out = plotting.adjust_array_min_distance([1, 1.1, 1.2, 5], min_distance=1.0)
         assert out == sorted(out)
 
-    def test_adjacent_gaps_meet_min_distance_when_bounds_allow(self):
-        out = plotting.adjust_array_min_distance([1, 1.1, 1.2], min_distance=1.0,
-                                                 max_values=[0, 100])
+    def test_adjacent_gaps_meet_min_distance(self):
+        out = plotting.adjust_array_min_distance([1, 1.1, 1.2], min_distance=1.0)
         for a, b in zip(out, out[1:]):
             assert b - a >= 1.0 - 1e-6
 
-    def test_values_stay_within_bounds(self):
-        out = plotting.adjust_array_min_distance([1, 1.1, 1.2], min_distance=2.0,
-                                                 max_values=[0, 10])
-        for v in out:
-            assert -max_values_default_lo(out) <= v <= 10 + 1e-6
+    def test_overlapping_points_separated_without_clamping(self):
+        """The ported algorithm spreads values freely instead of clamping to bounds."""
+        out = plotting.adjust_array_min_distance([1, 1.1, 1.2], min_distance=2.0)
+        # all neighbouring gaps meet the min distance
+        for a, b in zip(out, out[1:]):
+            assert b - a >= 2.0 - 1e-6
 
     def test_idempotent(self):
         vals = [1, 1.1, 1.2, 5]
-        once = plotting.adjust_array_min_distance(list(vals), min_distance=1.0,
-                                                  max_values=[0, 10])
-        twice = plotting.adjust_array_min_distance(list(once), min_distance=1.0,
-                                                   max_values=[0, 10])
+        once = plotting.adjust_array_min_distance(list(vals), min_distance=1.0)
+        twice = plotting.adjust_array_min_distance(list(once), min_distance=1.0)
         assert once == twice
 
     def test_empty_and_single_unchanged(self):
-        assert plotting.adjust_array_min_distance([], 1.0, [0, 10]) == []
-        assert plotting.adjust_array_min_distance([5], 1.0, [0, 10]) == [5]
+        assert plotting.adjust_array_min_distance([], 1.0) == []
+        assert plotting.adjust_array_min_distance([5], 1.0) == [5]
 
-
-def max_values_default_lo(mv):
-    # the lower bound used by the function is -max_values[0]/50; helper for clarity
-    return mv[0] / 50
+    def test_preserves_input_ordering(self):
+        """Values are returned in the same positional order as the input."""
+        vals = [5, 1, 3, 1.1]
+        out = plotting.adjust_array_min_distance(list(vals), min_distance=1.0)
+        # the smallest input stays the smallest output, etc.
+        assert sorted(zip(vals, out)) == sorted(zip(vals, out), key=lambda p: p[1])
+        # output ordering matches input ordering (not re-sorted in place)
+        ranks_in = sorted(range(len(vals)), key=lambda i: vals[i])
+        ranks_out = sorted(range(len(out)), key=lambda i: out[i])
+        assert ranks_in == ranks_out
 
 
 # --------------------------------------------------------------------------- #
