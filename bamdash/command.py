@@ -162,12 +162,18 @@ def get_args(sysargs):
     return args
 
 
-def _load_reference(args, ref):
+def _load_reference(args, ref, refs, warned_no_match=None):
     """
     Load coverage and track data for a single reference and build its figure.
 
     :param args: parsed CLI args
-    :param ref: reference id
+    :param ref: reference id being processed
+    :param refs: full list of requested reference ids; used to decide whether a
+        non-matching track file warrants a warning (a file that matches *some*
+        requested ref is silently skipped for the refs it does not contain)
+    :param warned_no_match: set of track paths already warned about in
+        ``main`` (files matching no requested ref); suppresses duplicate
+        per-reference warnings
     :return: ``(ref_fig, upper, log_upper, track_data, stat_dict, number_of_tracks)``
         or ``None`` if the reference has no usable data (e.g. zero-length)
     """
@@ -194,7 +200,17 @@ def _load_reference(args, ref):
                     track_heights = track_heights + [config.gb_track_proportion]
                     track_data.append([gb_dict, "gb", seq])
                 else:
-                    logger.warning("gb data does not contain the seq reference id '%s'", ref)
+                    # Only warn if this gb file matches none of the requested
+                    # references at all; otherwise it simply belongs to a
+                    # different reference and is expected to be empty here.
+                    # Files already warned about in main() are skipped to
+                    # avoid one warning per reference.
+                    if warned_no_match is None or track not in warned_no_match:
+                        gb_ids = data.gb_record_ids(track)
+                        if not (set(refs) & gb_ids):
+                            logger.warning(
+                                "gb data in %s does not contain any of the "
+                                "requested reference id(s) %s", track, refs)
                     number_of_tracks -= 1
             elif track.endswith("bed"):
                 bed_data = [data.bed_to_dict(track, coverage_df, ref, args.coverage), "bed"]
@@ -278,11 +294,23 @@ def main(sysargs=sys.argv[1:]):
                 missing, available_refs)
             sys.exit(1)
 
+    # Pre-screen track files that cannot match any requested reference so we
+    # can warn exactly once per offending file instead of once per reference.
+    warned_no_match = set()
+    if args.tracks:
+        for track in args.tracks:
+            if track.endswith("gb") and not (set(refs) & data.gb_record_ids(track)):
+                logger.warning(
+                    "gb data in %s does not contain any of the requested "
+                    "reference id(s) %s", track, refs)
+                warned_no_match.add(track)
+
     # load data and build a figure per reference
     ref_figures = {}
     for ref in refs:
         try:
-            fig, upper, log_upper, track_data, stat_dict, number_of_tracks = _load_reference(args, ref)
+            fig, upper, log_upper, track_data, stat_dict, number_of_tracks = _load_reference(
+                args, ref, refs, warned_no_match)
         except data.ReferenceNotFoundError as exc:
             # already validated above, but guard against races / zero-length refs
             logger.error("%s", exc)

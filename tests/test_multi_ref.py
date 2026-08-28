@@ -10,6 +10,10 @@ import unittest
 from pathlib import Path
 
 import pysam
+from Bio import SeqIO
+from Bio.Seq import Seq
+from Bio.SeqFeature import FeatureLocation, SeqFeature
+from Bio.SeqRecord import SeqRecord
 
 from bamdash.command import main
 
@@ -63,6 +67,27 @@ def _make_multi_ref_vcf(path: Path):
 def _make_multi_ref_bed(path: Path):
     """BED with records on both refA and refB."""
     path.write_text("refA\t1\t15\tregionA1\t0\t+\nrefB\t5\t25\tregionB1\t0\t-\n")
+
+
+def _make_gb_record(ref_id: str, length: int, feature_type: str = "CDS") -> SeqRecord:
+    """Build a minimal genbank SeqRecord for a reference."""
+    rec = SeqRecord(Seq("A" * length), id=ref_id, name=ref_id,
+                    annotations={"molecule_type": "DNA"})
+    rec.features = [
+        SeqFeature(FeatureLocation(1, 10, strand=1), type=feature_type),
+    ]
+    return rec
+
+
+def _make_single_ref_gb(path: Path, ref_id: str, length: int):
+    """Write a genbank file containing one record for *ref_id*."""
+    SeqIO.write([_make_gb_record(ref_id, length)], str(path), "genbank")
+
+
+def _make_multi_record_gb(path: Path, specs):
+    """Write a genbank file containing one record per (ref_id, length) tuple."""
+    records = [_make_gb_record(ref_id, length) for ref_id, length in specs]
+    SeqIO.write(records, str(path), "genbank")
 
 
 class MultiRefFixture(unittest.TestCase):
@@ -119,6 +144,73 @@ class TestRefIdArg(MultiRefFixture):
         self.assertIn("bamdash-ref-select", html)
         # order follows the user-supplied order
         self.assertLess(html.index('value="refB"'), html.index('value="refA"'))
+
+
+class TestGenbankTracks(MultiRefFixture):
+    """GenBank track handling across multiple references."""
+
+    def test_one_gb_per_reference_all_matched(self):
+        """One .gb file per reference: every reference gets its features."""
+        gbA = self.tmp / "refA.gb"
+        gbB = self.tmp / "refB.gb"
+        _make_single_ref_gb(gbA, "refA", 50)
+        _make_single_ref_gb(gbB, "refB", 30)
+        out = self._run("gb_per_ref", ["-t", str(gbA), str(gbB)])
+        html = Path(f"{out}.html").read_text()
+        # both panels present with genbank feature annotations
+        self.assertIn('id="plot-refA"', html)
+        self.assertIn('id="plot-refB"', html)
+        self.assertIn("CDS", html)
+
+    def test_single_multi_record_gb_all_matched(self):
+        """A single .gb file with both references: both refs get features.
+
+        Regression for the ``break`` bug in ``genbank_to_dict`` that stopped
+        scanning at the first non-matching record, so only the first reference
+        in a multi-record file was ever found.
+        """
+        multi_gb = self.tmp / "multi.gb"
+        _make_multi_record_gb(multi_gb, [("refA", 50), ("refB", 30)])
+        out = self._run("gb_multi_rec", ["-t", str(multi_gb)])
+        html = Path(f"{out}.html").read_text()
+        self.assertIn('id="plot-refA"', html)
+        self.assertIn('id="plot-refB"', html)
+        self.assertIn("CDS", html)
+
+    def test_non_matching_gb_warns_once(self):
+        """A .gb file matching none of the requested refs warns exactly once."""
+        gbX = self.tmp / "refX.gb"
+        _make_single_ref_gb(gbX, "refX", 40)
+        import logging
+        records = []
+        handler = logging.Handler()
+        handler.emit = lambda rec: records.append(rec.getMessage())
+        logger = logging.getLogger("bamdash")
+        logger.addHandler(handler)
+        try:
+            out = self._run("gb_nomatch", ["-t", str(gbX)])
+        finally:
+            logger.removeHandler(handler)
+        # exactly one warning mentioning the non-matching file
+        gb_warnings = [m for m in records if "refX.gb" in m]
+        self.assertEqual(len(gb_warnings), 1)
+
+    def test_matching_gb_no_warning(self):
+        """A .gb file matching a requested ref produces no gb warning."""
+        gbA = self.tmp / "refA.gb"
+        _make_single_ref_gb(gbA, "refA", 50)
+        import logging
+        records = []
+        handler = logging.Handler()
+        handler.emit = lambda rec: records.append(rec.getMessage())
+        logger = logging.getLogger("bamdash")
+        logger.addHandler(handler)
+        try:
+            self._run("gb_match", ["-r", "refA", "-t", str(gbA)])
+        finally:
+            logger.removeHandler(handler)
+        gb_warnings = [m for m in records if "does not contain" in m]
+        self.assertEqual(gb_warnings, [])
 
 
 class TestInvalidRef(MultiRefFixture):

@@ -213,6 +213,24 @@ def define_track_position(feature_dict):
     return feature_dict
 
 
+def gb_record_ids(gb_file):
+    """
+    Return the set of record ids and names contained in a genbank file.
+
+    Used to pre-screen gb files against the requested references so that a
+    file matching *some* reference does not emit a "does not match" warning
+    when it is tried against a reference it does not contain.
+
+    :param gb_file: genbank record location
+    :return: set of record id/name strings
+    """
+    ids = set()
+    for record in SeqIO.parse(open(gb_file, "r"), "genbank"):
+        ids.add(record.id)
+        ids.add(record.name)
+    return ids
+
+
 def genbank_to_dict(gb_file, coverage_df, ref, min_cov):
     """
     parses genbank to dic and computes coverage for each annotation
@@ -228,8 +246,11 @@ def genbank_to_dict(gb_file, coverage_df, ref, min_cov):
 
     for gb_record in SeqIO.parse(open(gb_file, "r"), "genbank"):
         if gb_record.id != ref and gb_record.name != ref:
-            logger.warning("ref id does not match genbank")
-            break
+            # keep scanning: a multi-record gb file may carry the requested
+            # ref in a later record. Whether a warning is warranted is decided
+            # by the caller (see command._load_reference) which knows the full
+            # set of requested references.
+            continue
         seq = gb_record.seq
         for feature in gb_record.features:
             if feature.type not in feature_dict:
