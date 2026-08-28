@@ -4,22 +4,21 @@ contains main workflow
 """
 
 # BUILT-INS
-import sys
 import argparse
 import copy
-import logging
 import json
+import logging
+import sys
 
 # LIBS
 import pandas as pd
 import pysam
 
-# BAMDASH
-from bamdash.scripts import data
-from bamdash.scripts import plotting
-from bamdash.scripts import html as html_mod
-from bamdash.scripts import config
 from bamdash import __version__
+
+# BAMDASH
+from bamdash.scripts import config, data, plotting
+from bamdash.scripts import html as html_mod
 
 logger = logging.getLogger("bamdash")
 
@@ -104,6 +103,16 @@ def get_args(sysargs):
         action=argparse.BooleanOptionalAction,
         default=False,
         help="show slider"
+    )
+    parser.add_argument(
+        "--offline",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="inline the plotly.js bundle into the output html so the file is "
+             "fully usable without an internet connection (default: True). "
+             "Use --no-offline to load plotly.js from a CDN instead, which "
+             "produces a much smaller html file but requires internet access "
+             "to view"
     )
     parser.add_argument(
         "-d",
@@ -334,7 +343,7 @@ def main(sysargs=sys.argv[1:]):
             # keeps the output consistent: the dropdown just lists the one
             # available reference and the global log/linear toggle is always
             # present next to it.
-            html_mod.build_master_html(ref_figures, args.prefix)
+            html_mod.build_master_html(ref_figures, args.prefix, args.offline)
         else:
             # static image: one file per reference as {prefix}_{ref}.{suffix}
             for ref, payload in ref_figures.items():

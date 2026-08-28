@@ -225,3 +225,33 @@ class TestMasterHtmlStructure:
         html = Path(f"{out}.html").read_text()
         assert "bamdash-ref-select" in html
         assert 'id="bamdash-scale-toggle"' in html
+
+
+# --------------------------------------------------------------------------- #
+# --offline / --no-offline: plotly.js inlined vs CDN
+# --------------------------------------------------------------------------- #
+class TestOfflineOnlineArg:
+    def test_offline_inlines_plotly_bundle(self, two_ref_bam, two_ref_vcf, two_ref_bed, tmp_out):
+        out = _run(two_ref_bam, tmp_out, ["-t", str(two_ref_vcf), str(two_ref_bed), "--offline"])
+        html = Path(f"{out}.html").read_text()
+        # the plotly.js bundle is inlined in a <script> block (no src)
+        assert "Plotly.newPlot" in html
+        assert 'src="https://cdn' not in html
+        # the inlined bundle is large (~3MB); a CDN-free offline file is big
+        assert len(html) > 1_000_000
+
+    def test_no_offline_loads_plotly_from_cdn(self, two_ref_bam, two_ref_vcf, two_ref_bed, tmp_out):
+        out = _run(two_ref_bam, tmp_out, ["-t", str(two_ref_vcf), str(two_ref_bed), "--no-offline"])
+        html = Path(f"{out}.html").read_text()
+        # plotly.js is loaded from the CDN, not inlined
+        import plotly
+        assert f"cdn.plot.ly/plotly-{plotly.__version__}.min.js" in html
+        # the CDN file is much smaller than the inlined bundle
+        assert len(html) < 500_000
+
+    def test_offline_is_default(self, two_ref_bam, tmp_out):
+        """Without --offline/--no-offline, the plotly bundle is inlined."""
+        out = _run(two_ref_bam, tmp_out, [])
+        html = Path(f"{out}.html").read_text()
+        assert 'src="https://cdn' not in html
+        assert len(html) > 1_000_000

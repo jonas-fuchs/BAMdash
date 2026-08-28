@@ -109,6 +109,12 @@ full usage:
   -c 5, --coverage 5    minimum coverage
   --slider, --no-slider
                         show slider (default: False)
+  --offline, --no-offline
+                        inline the plotly.js bundle into the output html so
+                        the file is fully usable without an internet
+                        connection (default: True). Use --no-offline to load
+                        plotly.js from a CDN instead, which produces a much
+                        smaller html file but requires internet access to view
   -d px px, --dimensions px px
                         width and height of static (non-html) output in px
                         (default: 1920 1080; ignored when only html is

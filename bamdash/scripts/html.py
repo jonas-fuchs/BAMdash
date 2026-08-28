@@ -3,13 +3,15 @@ contains defs for assembling the multi-reference master HTML
 """
 # BUILT INS
 import html
+
+# LIBS
+import json
 import logging
 import re
 from importlib.resources import files
 from string import Template
 
-# LIBS
-import json
+import plotly
 import plotly.offline as pyo
 
 logger = logging.getLogger("bamdash")
@@ -50,19 +52,31 @@ def _panel_for_ref(fig, ref):
     return panel, safe_id
 
 
-def build_master_html(ref_figures, prefix):
+def build_master_html(ref_figures, prefix, offline=True):
     """
     Assemble a master HTML document containing one panel per reference and a
-    dropdown to switch between them. plotly.js is inlined once so the file is
-    fully usable offline.
+    dropdown to switch between them.
 
     :param ref_figures: ordered mapping ``{ref: {"fig": fig, ...}}``; order is
         preserved for the dropdown
     :param prefix: output path/prefix; the master HTML is written to
         ``f"{prefix}.html"``
+    :param offline: when True (default) the plotly.js bundle is inlined into
+        the document so it is fully usable without an internet connection.
+        When False, plotly.js is loaded from a CDN instead, which produces a
+        much smaller html file but requires internet access to view.
     """
-    # inline the plotly.js bundle once (offline, ~3MB)
-    plotly_js = pyo.get_plotlyjs()
+    if offline:
+        # inline the plotly.js bundle once (offline, ~3MB)
+        plotly_js = pyo.get_plotlyjs()
+        plotly_tag = f"<script>{plotly_js}</script>"
+    else:
+        # load plotly.js from the CDN; keeps the html small but needs internet
+        plotly_version = plotly.__version__
+        plotly_tag = (
+            f'<script src="https://cdn.plot.ly/plotly-{plotly_version}.min.js">'
+            f"</script>"
+        )
 
     dropdown_options = []
     panels = []
@@ -89,7 +103,7 @@ def build_master_html(ref_figures, prefix):
     template = Template(template_path.read_text(encoding="utf-8"))
     master = template.safe_substitute(
         title=html.escape(prefix),
-        plotly_js=plotly_js,
+        plotly_js=plotly_tag,
         dropdown_options="\n".join(dropdown_options),
         panels="\n".join(panels),
         axis_ranges=json.dumps(axis_ranges),
