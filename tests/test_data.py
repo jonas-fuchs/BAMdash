@@ -246,7 +246,7 @@ class TestBedToDict:
 
     def test_zero_based_start_converted_to_one_based(self, tmp_path):
         d = self._dict(tmp_path, [{"chrom": "ref", "start": 0, "stop": 10}])
-        ann = d["bed annotations"]
+        ann = d["b"]
         key = next(iter(ann))
         # start 0 -> 1 ; stop unchanged
         assert ann[key]["start"] == [1]
@@ -256,32 +256,32 @@ class TestBedToDict:
     def test_column_mapping_name_score_strand_positional(self, tmp_path):
         d = self._dict(tmp_path, [{"chrom": "ref", "start": 0, "stop": 5,
                                     "name": "gene1", "score": "42", "strand": "+"}])
-        ann = d["bed annotations"][next(iter(d["bed annotations"]))]
+        ann = d["b"][next(iter(d["b"]))]
         assert ann["name"] == "gene1"
         assert ann["score"] == "42"
         assert ann["strand"] == "+"
 
     def test_default_strand_na_when_absent(self, tmp_path):
         d = self._dict(tmp_path, [{"chrom": "ref", "start": 0, "stop": 5}])
-        ann = d["bed annotations"][next(iter(d["bed annotations"]))]
+        ann = d["b"][next(iter(d["b"]))]
         assert ann["strand"] == "NA"
 
     def test_comment_and_short_lines_skipped(self, tmp_path):
         # a comment line and a 2-field line should not break parsing
         d = self._dict(tmp_path, [{"chrom": "ref", "start": 0, "stop": 5}],
                        comments=["# header comment", "ref\t1"])
-        assert len(d["bed annotations"]) == 1
+        assert len(d["b"]) == 1
 
     def test_no_matching_ref_returns_empty_annotations(self, tmp_path):
         d = self._dict(tmp_path, [{"chrom": "other", "start": 0, "stop": 5}], ref="ref")
-        assert d["bed annotations"] == {}
+        assert d["b"] == {}
 
     def test_per_region_coverage_and_recovery(self, tmp_path):
         df = coverage_df(list(range(1, 11)), [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
         bed = tmp_path / "b.bed"
         make_bed(bed, [{"chrom": "ref", "start": 0, "stop": 4}])  # positions 1-4
         d = data.bed_to_dict(bed, df, "ref", min_cov=2)
-        ann = d["bed annotations"][next(iter(d["bed annotations"]))]
+        ann = d["b"][next(iter(d["b"]))]
         # independent: mean = (0+1+2+3)/4 = 1.5 -> round = 2 ; recovery = (#>2)/4*100 = 25
         assert ann["mean coverage"] == round((0 + 1 + 2 + 3) / 4)
         assert ann["% recovery >= 2x"] == round(len([c for c in [0, 1, 2, 3] if c > 2]) / 4 * 100, 2)

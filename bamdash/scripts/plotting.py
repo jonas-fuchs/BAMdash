@@ -199,8 +199,7 @@ def create_coverage_plot(fig, row, coverage_df, bin_size):
             line={"color": config.coverage_line_color},
             hovertemplate=h_template,
             legendgroup="coverage",
-            legendgrouptitle_text="coverage",
-            name="",
+            name="coverage",
             showlegend=True
         ),
         row=row,
@@ -218,8 +217,7 @@ def create_coverage_plot(fig, row, coverage_df, bin_size):
             line={"color": config.average_line_color, "width": config.average_line_width, "dash": "dash"},
             showlegend=True,
             legendgroup="average",
-            name="",
-            legendgrouptitle_text="average",
+            name="average",
         ),
         row=row,
         col=1
@@ -403,9 +401,8 @@ def create_vcf_plot(fig, row, vcf_df):
                 go.Scatter(
                     x=vcf_subset["position_jittered"],
                     y=y_data,
-                    name=f"plot {row}",
+                    name=mut,
                     legendgroup=mut,
-                    legendgrouptitle_text=mut,
                     mode="markers",
                     customdata=vcf_subset,
                     showlegend=show_legend,
@@ -524,7 +521,6 @@ def create_track_plot(fig, row, feature_dict, box_size, box_alpha):
                             mode='lines',
                             line={"color": color_thes[cycle]},
                             legendgroup=feature,
-                            legendgrouptitle_text=feature,
                             hoverinfo='skip',
                             showlegend=False,
                         ),
@@ -542,9 +538,8 @@ def create_track_plot(fig, row, feature_dict, box_size, box_alpha):
                         line={"color": color_thes[cycle]},
                         showlegend=legend_vis if previous_legend_vis is None else False,  # edge case for tracks that start with part features and result in legend duplication
                         hoverinfo='skip',
-                        name=f"plot {row}",
+                        name=feature,
                         legendgroup=feature,
-                        legendgrouptitle_text=feature,
                     ),
                     row=row,
                     col=1

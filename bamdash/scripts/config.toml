@@ -23,7 +23,7 @@ average_line_color = "grey"
 average_line_width = 1
 
 # track customize
-track_color_scheme = "agsunset"          # for multiple annotation tracks (genbank)
+track_color_scheme = "geyser"          # for multiple annotation tracks (genbank)
 track_color_single = "rgb(145, 145, 145)"  # for single tracks (any rgb value, but no named colors)
 strand_types = ["triangle-right", "triangle-left", "diamond-wide"]  # +, -, undefined strand
 strand_marker_size = 8
@@ -31,8 +31,8 @@ strand_marker_line_width = 1
 strand_marker_line_color = "rgba(0, 0, 0, 0.2)"
 box_bed_alpha = [0.7, 0.7]   # alpha values for boxes (bed)
 box_bed_size = [0.4, 0.4]    # size values for boxes (bed)
-box_gb_alpha = [0.7, 0.8]    # alpha values for boxes (gb)
-box_gb_size = [0.4, 0.3]     # size values for boxes (gb)
+box_gb_alpha = [0.7, 0.7]    # alpha values for boxes (gb)
+box_gb_size = [0.3, 0.3]     # size values for boxes (gb)
 
 # variant customize
 variant_marker_size = 7

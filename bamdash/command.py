@@ -263,7 +263,8 @@ def _load_reference(args, ref, refs, warned_no_match=None):
                     number_of_tracks -= 1
             elif track.endswith("bed"):
                 bed_data = [data.bed_to_dict(track, coverage_df, ref, args.coverage), "bed"]
-                if bed_data[0]["bed annotations"]:
+                # bed_to_dict keys the feature dict by the filename stem
+                if bed_data[0] and next(iter(bed_data[0].values())):
                     track_heights = track_heights + [config.bed_track_proportion]
                     track_data.append(bed_data)
                 else:
@@ -311,7 +312,8 @@ def _dump_reference(args, ref, track_data, stat_dict, multi):
                 track[0].to_csv(f"{prefix}_vcf_data_{vcf_track_count}.tabular", sep="\t", header=True, index=False)
                 vcf_track_count += 1
             elif track[1] == "bed":
-                bed_df = pd.DataFrame.from_dict(track[0]["bed annotations"], orient="index")
+                bed_key = next(iter(track[0]))
+                bed_df = pd.DataFrame.from_dict(track[0][bed_key], orient="index")
                 bed_df.drop("track", axis=1, inplace=True)
                 bed_df.to_csv(f"{prefix}_bed_data_{bed_track_count}.tabular", sep="\t", header=True, index=False)
                 bed_track_count += 1

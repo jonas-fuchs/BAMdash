@@ -4,6 +4,7 @@ contains defs for data analysis
 # BUILT INS
 import math
 import logging
+from pathlib import Path
 
 # LIBS
 import pandas as pd
@@ -299,6 +300,11 @@ def bed_to_dict(bed_file, coverage_df, ref, min_cov):
     :param min_cov: min coverage to consider covered
     :return: bed_dict: dictionary with all features
     """
+    # key the feature dict by the bed filename stem so that multiple bed
+    # files each get their own legend entry / legendgroup and can be
+    # toggled independently in the plot (consistent with how genbank uses
+    # feature types as keys).
+    bed_key = Path(bed_file).stem
     # first extract as list of list to be able to sort
     # (otherwise track info will be incorrect)
     bed_line_list = []
@@ -318,23 +324,23 @@ def bed_to_dict(bed_file, coverage_df, ref, min_cov):
     bed_line_list = sorted(bed_line_list, key=lambda x: x[1])
 
     # populate dictionary
-    bed_dict = {"bed annotations": {}}
+    bed_dict = {bed_key: {}}
     possible_classifiers = ["name", "score", "strand"]
     for line in bed_line_list:
         start, stop = int(line[1]), int(line[2])
-        bed_dict["bed annotations"][f"{start} {stop}"] = {}
-        bed_dict["bed annotations"][f"{start} {stop}"]["start"] = [start]
-        bed_dict["bed annotations"][f"{start} {stop}"]["stop"] = [stop]
+        bed_dict[bed_key][f"{start} {stop}"] = {}
+        bed_dict[bed_key][f"{start} {stop}"]["start"] = [start]
+        bed_dict[bed_key][f"{start} {stop}"]["stop"] = [stop]
         # always add strand dummy information in case its not in bed file
-        bed_dict["bed annotations"][f"{start} {stop}"]["strand"] = "NA"
+        bed_dict[bed_key][f"{start} {stop}"]["strand"] = "NA"
         # check for additional info
         if len(line) > 3:
             for element, classifier in zip(line[3:], possible_classifiers):
-                bed_dict["bed annotations"][f"{start} {stop}"][classifier] = element
+                bed_dict[bed_key][f"{start} {stop}"][classifier] = element
         # compute mean coverage
         mean_cov, rec = get_coverage_stats(coverage_df, start, stop, min_cov)
-        bed_dict["bed annotations"][f"{start} {stop}"]["mean coverage"] = mean_cov
-        bed_dict["bed annotations"][f"{start} {stop}"][f"% recovery >= {min_cov}x"] = rec
+        bed_dict[bed_key][f"{start} {stop}"]["mean coverage"] = mean_cov
+        bed_dict[bed_key][f"{start} {stop}"][f"% recovery >= {min_cov}x"] = rec
 
     return define_track_position(bed_dict)
 

@@ -306,19 +306,41 @@ class TestTrackPlot:
         assert m["x"] == [expected_x]
 
     def test_single_feature_type_uses_track_color_single(self, two_ref_bam, two_ref_bed, tmp_out):
-        # bed has a single "bed annotations" feature type => single color
+        # bed has a single feature type (the filename stem) => single color
         data, _ = _fig_and_payload(two_ref_bam, tmp_out, ["-t", str(two_ref_bed)], ref="refA")
         boxes = [t for t in data if t.get("fill") == "toself"]
         # the base color is config.track_color_single (rgb(145,145,145)) with alpha applied
         assert "145, 145, 145" in boxes[0]["fillcolor"]
+
+    def test_bed_legend_name_is_filename_stem(self, two_ref_bam, two_ref_bed, tmp_out):
+        # the bed fixture is named multi.bed => legend name/group is "multi"
+        data, _ = _fig_and_payload(two_ref_bam, tmp_out, ["-t", str(two_ref_bed)], ref="refA")
+        boxes = [t for t in data if t.get("fill") == "toself" and t.get("showlegend")]
+        assert boxes, "expected a visible bed legend entry"
+        assert boxes[0]["name"] == "multi"
+        assert boxes[0]["legendgroup"] == "multi"
+
+    def test_two_bed_files_get_independent_legend_entries(self, two_ref_bam, tmp_path, tmp_out):
+        # two bed files with distinct names => distinct legend entries/groups
+        bed1 = tmp_path / "amplicons.bed"
+        bed2 = tmp_path / "primers.bed"
+        make_bed(bed1, [{"chrom": "refA", "start": 1, "stop": 10, "strand": "+"}])
+        make_bed(bed2, [{"chrom": "refA", "start": 20, "stop": 30, "strand": "-"}])
+        data, _ = _fig_and_payload(two_ref_bam, tmp_out, ["-t", str(bed1), str(bed2)], ref="refA")
+        shown = [t for t in data if t.get("fill") == "toself" and t.get("showlegend")]
+        names = {t["name"] for t in shown}
+        groups = {t["legendgroup"] for t in shown}
+        assert names == {"amplicons", "primers"}
+        assert groups == {"amplicons", "primers"}
 
     def test_gb_box_traces_present(self, two_ref_bam, make_gb_path, tmp_out):
         gbA = make_gb_path([make_gb_record("refA", 50, features=[{"type": "CDS", "location": [(1, 10, 1)]}])], "refA.gb")
         data, _ = _fig_and_payload(two_ref_bam, tmp_out, ["-t", str(gbA)], ref="refA")
         boxes = [t for t in data if t.get("fill") == "toself"]
         assert len(boxes) >= 1
-        # legendgrouptitle text is the feature type
-        assert any(b.get("legendgrouptitle", {}).get("text") == "CDS" for b in boxes)
+        # flat legend: trace name is the feature type, no group header
+        assert any(b.get("name") == "CDS" for b in boxes)
+        assert all(not b.get("legendgrouptitle") for b in boxes)
 
     def test_track_yaxis_hidden_and_reversed(self, two_ref_bam, two_ref_bed, tmp_out):
         _data, layout = _fig_and_payload(two_ref_bam, tmp_out, ["-t", str(two_ref_bed)], ref="refA")
