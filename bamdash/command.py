@@ -46,7 +46,7 @@ def get_args(sysargs):
         type=str,
         nargs="*",
         metavar="REF_ID",
-        help="seq reference id(s); default: all references in bam"
+        help="seq reference id(s) for which to generate plots; default: all references in bam if argument is omitted"
     )
     parser.add_argument(
         "-p",

@@ -1,7 +1,7 @@
 
 <img src="./bamdash.png" alt="bamdash" />
 
-[![language](https://img.shields.io/badge/python-%3E3.11-green)](https://www.python.org/)
+[![language](https://img.shields.io/badge/python-%3E3.11,%3C3.14-green)](https://www.python.org/)
 [![License: GPL v3](https://img.shields.io/github/license/jonas-fuchs/bamdash)](https://www.gnu.org/licenses/gpl-3.0)
 ![Static Badge](https://img.shields.io/badge/platform-linux_osx-blue)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17913086.svg)](https://zenodo.org/records/17913086)
@@ -20,7 +20,7 @@
 - **add** additional tracks (supported: `.vcf`, `.gb`, `.bed`)
 - **plot** multiple references in a single `html` with a dropdown to switch between them
 - **annotate** tracks with additional information
-- **export** annoated track data as tabular files (`.bed`, `.vcf`) or json (`.gb`)
+- **export** annotated track data as tabular files (`.bed`, `.vcf`) or json (`.gb`)
 - **customize** all plotting parameters
 
 **Feel free to report any bugs or request new features as issues!**
@@ -28,13 +28,13 @@
 
 ## Automatic annotation
 
-BAMdash automatically computes serveral statistics:
+BAMdash automatically computes several statistics:
 
 - if `-bs` is > 1 it computes the mean over the bin size in the coverage plot
 - for each track it computes recovery and mean coverage (set `-c` for the min coverage) for each element in the track
 - if a `*.vcf` is provided it annotates `TRANSITION`/`TRANSVERSION` and type of exchange (`SNP`, `DEL`, `INS`)
 
-If a `*.gb`and `*.vcf` is provided BAMdash computes if the mutations could have been caused by APOBEC deamination. 
+If a `*.gb` and `*.vcf` is provided BAMdash computes if the mutations could have been caused by APOBEC deamination. 
 Moreover, it annotates the aminoacid exchange and the effect in the CDS (inspired by but not as powerful as [snpeff](http://pcingola.github.io/SnpEff/snpeff)). SNP and INDEL vcf annotation supports:
 
 - `START_LOST`: INDEL or SNP start at the CDS and result in a start loss
@@ -60,7 +60,7 @@ The nomenclature for the aminoacid effect is pretty simplified:
 
 ## Installation
 
-### via pip (recommened):
+### via pip (recommended):
 ```shell
 pip install bamdash
 ```
@@ -92,40 +92,31 @@ full usage:
   -h, --help            show this help message and exit
   -b BAM, --bam BAM     bam file location
   -r [REF_ID ...], --ref-id [REF_ID ...]
-                        seq reference id(s); default: all references in bam.
-                        When more than one reference is plotted, the output html
-                        contains a dropdown to switch between references.
+                        seq reference id(s); default: all references in bam
   -p ./plot, --prefix ./plot
                         path and partial filename for output files
   -s [html ...], --suffix [html ...]
-                        output file extensions appended to prefix (allowed:
-                        html, png, jpg, jpeg, webp, svg, pdf, eps)
+                        output file extensions appended to prefix (allowed: html, png, jpg, jpeg, webp, svg, pdf, eps), multiple
+                        values allowed, default: html
   -q 15, --quality-threshold 15
-                        quality threshold for reads
-  -bs N, --binsize N    bins for the coverage plot
+                        quality threshold for reads (default: 15)
+  -bs N, --binsize N    bins the coverage data into N bp bins (default: 1, no binning)
   -t [track_1 ...], --tracks [track_1 ...]
-                        file location of tracks (accepted: *.vcf, *.bed, *.gb)
+                        file location of tracks (accepted: *.vcf, *.bed, *.gb, multiple paths to files allowed)
   -c 5, --coverage 5    minimum coverage
   --slider, --no-slider
-                        show slider (default: False)
+                        show slider
   --offline, --no-offline
-                        inline the plotly.js bundle into the output html so
-                        the file is fully usable without an internet
-                        connection (default: True). Use --no-offline to load
-                        plotly.js from a CDN instead, which produces a much
+                        inline the plotly.js bundle into the output html so the file is fully usable without an internet
+                        connection (default: True). Use --no-offline to load plotly.js from a CDN instead, which produces a much
                         smaller html file but requires internet access to view
-  --custom-config TOML  path to a user-supplied TOML config file whose
-                        settings override the shipped defaults (see
-                        config.toml). Only the keys present in the file are
-                        overwritten; all others keep their default values
+  --custom-config TOML  path to a user-supplied TOML config file whose settings override the shipped defaults (see config.toml).
+                        Only the keys present in the file are overwritten; all others keep their default values
   -d px px, --dimensions px px
-                        width and height of static (non-html) output in px
-                        (default: 1920 1080; ignored when only html is
+                        width and height of static (non-html) output in px (default: 1920 1080; ignored when only html is
                         requested)
-  --dump, --no-dump     dump annotated track data; filenames derive from
-                        --prefix (default: False)
-  --verbose             increase logging verbosity: --verbose for INFO,
-                        --verbose --verbose for DEBUG
+  --dump, --no-dump     dump annotated track data; filenames derive from --prefix (default: no dump)
+  --verbose             increase logging verbosity: --verbose for INFO, --verbose --verbose for DEBUG
   -v, --version         show program's version number and exit
 ```
 
