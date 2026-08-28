@@ -3,10 +3,10 @@ contains defs for plotting
 """
 
 # BUILT-INS
+import logging
 import math
 import statistics
 import sys
-import logging
 from collections import Counter
 
 import pandas as pd
@@ -26,10 +26,10 @@ def _ensure_custom_templates():
     """
     pio.templates["plotly_white_custom"] = pio.templates["plotly_white"]
     pio.templates["plotly_white_custom"].update(
-        layout=dict(yaxis=dict(linecolor="black", tickcolor="black", zerolinecolor="white"),
-                    xaxis=dict(linecolor="black", tickcolor="black", zerolinecolor="white"),
-                    updatemenudefaults=dict(bgcolor="rgb(204, 204, 204)")
-                    )
+        layout={"yaxis": {"linecolor": "black", "tickcolor": "black", "zerolinecolor": "white"},
+                    "xaxis": {"linecolor": "black", "tickcolor": "black", "zerolinecolor": "white"},
+                    "updatemenudefaults": {"bgcolor": "rgb(204, 204, 204)"}
+                    }
     )
 
 
@@ -88,14 +88,14 @@ def build_figure(ref, coverage_df, track_data, number_of_tracks, track_heights,
     fig.update_layout(
         template="plotly_white_custom",
         hovermode="closest",
-        font=dict(
-            family=config.font,
-            size=config.font_size,
-        ),
+        font={
+            "family": config.font,
+            "size": config.font_size,
+        },
         # add global stats as annotation
         annotations=[
-            dict(text=title, y=1.14, yref="paper",
-                 align="center", showarrow=False)
+            {"text": title, "y": 1.14, "yref": "paper",
+                 "align": "center", "showarrow": False}
         ]
     )
     # global x axes
@@ -121,10 +121,10 @@ def build_figure(ref, coverage_df, track_data, number_of_tracks, track_heights,
     # if a range slider is shown, do not display the xaxis title
     if args.slider:
         fig.update_xaxes(
-            rangeslider=dict(
-                visible=True,
-                thickness=0.05
-            ),
+            rangeslider={
+                "visible": True,
+                "thickness": 0.05
+            },
             row=number_of_tracks
         )
     else:
@@ -143,8 +143,8 @@ def prepare_static(fig, log_upper):
     """
     if config.show_log:  # correct log layout
         fig.update_yaxes(type="log", dtick=1, row=1, range=[0, log_upper], autorange=False)
-    fig.update_layout(updatemenus=[dict(visible=False)])  # no buttons
-    fig.update_layout(annotations=[dict(visible=False)])  # no annotations
+    fig.update_layout(updatemenus=[{"visible": False}])  # no buttons
+    fig.update_layout(annotations=[{"visible": False}])  # no annotations
 
 
 def create_coverage_plot(fig, row, coverage_df, bin_size):
@@ -196,7 +196,7 @@ def create_coverage_plot(fig, row, coverage_df, bin_size):
             customdata=coverage_df_plot,
             fill="tonexty",
             fillcolor=config.coverage_fill_color,
-            line=dict(color=config.coverage_line_color),
+            line={"color": config.coverage_line_color},
             hovertemplate=h_template,
             legendgroup="coverage",
             legendgrouptitle_text="coverage",
@@ -215,7 +215,7 @@ def create_coverage_plot(fig, row, coverage_df, bin_size):
             text=["", f"{round(average_cov)}x"],
             textposition="bottom left",
             mode="lines+text",
-            line=dict(color=config.average_line_color, width=config.average_line_width, dash="dash"),
+            line={"color": config.average_line_color, "width": config.average_line_width, "dash": "dash"},
             showlegend=True,
             legendgroup="average",
             name="",
@@ -321,20 +321,20 @@ def create_vcf_plot(fig, row, vcf_df):
                             (x_value, -0.15, x_value_jittered, 0),
                             (x_value_jittered, 0, x_value_jittered, y_value)]:
             shapes.append(
-                dict(
-                    type="line",
-                    xref=f"x{row}",
-                    yref=f"y{row}",
-                    x0=coordinates[0],
-                    y0=coordinates[1],
-                    x1=coordinates[2],
-                    y1=coordinates[3],
-                    line=dict(
-                        color=config.stem_color,
-                        width=config.stem_width
-                    ),
-                    layer='below'
-                )
+                {
+                    "type": "line",
+                    "xref": f"x{row}",
+                    "yref": f"y{row}",
+                    "x0": coordinates[0],
+                    "y0": coordinates[1],
+                    "x1": coordinates[2],
+                    "y1": coordinates[3],
+                    "line": {
+                        "color": config.stem_color,
+                        "width": config.stem_width
+                    },
+                    "layer": 'below'
+                }
             )
 
     # plot shape in each subplot
@@ -380,14 +380,14 @@ def create_vcf_plot(fig, row, vcf_df):
                     customdata=vcf_subset,
                     showlegend=show_legend,
                     hovertemplate=h_template,
-                    marker=dict(
-                        color=color,
-                        size=config.variant_marker_size,
-                        line=dict(
-                            color=config.variant_line_color,
-                            width=config.variant_marker_line_width
-                        )
-                    )
+                    marker={
+                        "color": color,
+                        "size": config.variant_marker_size,
+                        "line": {
+                            "color": config.variant_line_color,
+                            "width": config.variant_marker_line_width
+                        }
+                    }
                 ),
             row=row,
             col=1
@@ -460,15 +460,15 @@ def create_track_plot(fig, row, feature_dict, box_size, box_alpha):
                     y=[track],
                     legendgroup=feature,
                     mode="markers",
-                    marker=dict(
-                        size=config.strand_marker_size,
-                        symbol=marker_type,
-                        color=color,
-                        line=dict(
-                            width=config.strand_marker_line_width,
-                            color=config.strand_marker_line_color
-                        )
-                    ),
+                    marker={
+                        "size": config.strand_marker_size,
+                        "symbol": marker_type,
+                        "color": color,
+                        "line": {
+                            "width": config.strand_marker_line_width,
+                            "color": config.strand_marker_line_color
+                        }
+                    },
                     name="",
                     showlegend=False,
                     hoverinfo="text",
@@ -492,7 +492,7 @@ def create_track_plot(fig, row, feature_dict, box_size, box_alpha):
                             x=[line_x[0], line_x[1]],
                             y=[track, track],  # y-coordinate of the hline
                             mode='lines',
-                            line=dict(color=color_thes[cycle]),
+                            line={"color": color_thes[cycle]},
                             legendgroup=feature,
                             legendgrouptitle_text=feature,
                             hoverinfo='skip',
@@ -509,7 +509,7 @@ def create_track_plot(fig, row, feature_dict, box_size, box_alpha):
                         mode="lines",
                         fill="toself",
                         fillcolor=color_thes[cycle],
-                        line=dict(color=color_thes[cycle]),
+                        line={"color": color_thes[cycle]},
                         showlegend=legend_vis if previous_legend_vis is None else False,  # edge case for tracks that start with part features and result in legend duplication
                         hoverinfo='skip',
                         name=f"plot {row}",
