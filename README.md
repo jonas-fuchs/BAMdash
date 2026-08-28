@@ -56,7 +56,7 @@ The nomenclature for the aminoacid effect is pretty simplified:
 - `A58fsX` - Frameshift at pos 58
 
 ## Example
-<img src="./example.gif" alt="example" />
+<img src="./example.png" alt="example" />
 
 ## Installation
 
