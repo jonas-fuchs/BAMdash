@@ -77,8 +77,14 @@ def build_figure(ref, coverage_df, track_data, number_of_tracks, track_heights,
             elif track[1] == "bed":
                 create_track_plot(fig, row, track[0], config.box_bed_size, config.box_bed_alpha)
 
-    # compute upper thresholds for y axis
-    upper = max(coverage_df["coverage"] + max(coverage_df["coverage"] / 10))
+    # compute upper thresholds for y axis. Guard against empty or all-zero
+    # coverage (e.g. a bam with a reference sequence but no mapped reads):
+    # max(coverage) == 0 would make log10(upper) a domain error and produce a
+    # degenerate [0, 0] axis range, so fall back to a flat [0, 1] axis.
+    max_cov = max(coverage_df["coverage"]) if not coverage_df.empty else 0
+    upper = max_cov + max_cov / 10
+    if upper <= 0:
+        upper = 1
     log_upper = max(1, math.ceil(math.log10(upper)))
 
     # global formatting. No per-figure linear/log updatemenu buttons are

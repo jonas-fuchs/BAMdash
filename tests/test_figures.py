@@ -15,7 +15,10 @@ unit-tested directly.
 """
 from __future__ import annotations
 
+import argparse
+import json
 import math
+import re
 import statistics
 from pathlib import Path
 
@@ -26,6 +29,7 @@ from plotly.subplots import make_subplots
 
 from bamdash.scripts import config, plotting
 from tests.conftest import (
+    coverage_df,
     make_bam,
     make_bed,
     make_gb,
@@ -225,6 +229,43 @@ class TestAxisRanges:
         ranges = json.loads(m.group(1))
         assert ranges["refA"]["linear"] == [0, upper]
         assert ranges["refA"]["log"] == [0, log_upper]
+
+
+# --------------------------------------------------------------------------- #
+# Empty / zero-coverage bams
+# --------------------------------------------------------------------------- #
+class TestEmptyCoverage:
+    """A bam with a reference sequence but no mapped reads yields all-zero
+    coverage. The y-axis thresholds must fall back to a valid range instead of
+    raising ``ValueError: math domain error`` from ``log10(0)``."""
+
+    def test_build_figure_all_zero_coverage_returns_valid_thresholds(self):
+        cov = coverage_df(list(range(1, 51)), [0] * 50)
+        args = argparse.Namespace(binsize=1, slider=False)
+        fig, upper, log_upper = plotting.build_figure(
+            "refA", cov, [], 1, [1], "title", args)
+        # upper falls back to a non-degenerate axis range [0, 1]
+        assert upper == 1
+        assert log_upper == 1
+
+    def test_cli_empty_bam_writes_html_with_valid_axis_ranges(self, tmp_path, tmp_out):
+        bam = tmp_path / "empty.bam"
+        make_bam(bam, refs=[("refA", 50)], reads=[])
+        out = run_cli(bam, tmp_out, [])
+        html_text = Path(f"{out}.html").read_text()
+        m = re.search(r"var bamdashAxisRanges = (\{.*?\});", html_text, re.DOTALL)
+        assert m, "bamdashAxisRanges not found"
+        ranges = json.loads(m.group(1))
+        assert ranges["refA"]["linear"] == [0, 1]
+        assert ranges["refA"]["log"] == [0, 1]
+
+    def test_cli_empty_bam_coverage_trace_is_flat_zero(self, tmp_path, tmp_out):
+        bam = tmp_path / "empty.bam"
+        make_bam(bam, refs=[("refA", 50)], reads=[])
+        data, _ = _fig_and_payload(bam, tmp_out, [], ref="refA")
+        cov_traces = [t for t in data if t.get("name") == "coverage"]
+        assert len(cov_traces) == 1
+        assert all(y == 0 for y in cov_traces[0]["y"])
 
 
 # --------------------------------------------------------------------------- #
