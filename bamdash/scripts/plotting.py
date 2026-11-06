@@ -91,6 +91,14 @@ def build_figure(ref, coverage_df, track_data, number_of_tracks, track_heights,
     # added: the master HTML page provides a single global log/linear
     # toggle (next to the reference dropdown) that relayouts every
     # subfigure at once, so per-figure buttons would be redundant.
+    #
+    # The stats annotation is anchored with its BOTTOM edge at the top of the
+    # plotting area (y=1, yref="paper", yanchor="bottom") so the text grows
+    # upward into the reserved top margin. A fractional offset like y=1.14
+    # scales with the figure height: on tall panels (large window, many
+    # tracks) the text moved above the SVG viewport and was clipped away
+    # entirely -- reported as a disappearing stats header in Firefox/Edge on
+    # Windows. Window-size dependent, not browser specific.
     fig.update_layout(
         template="plotly_white_custom",
         hovermode="closest",
@@ -98,9 +106,12 @@ def build_figure(ref, coverage_df, track_data, number_of_tracks, track_heights,
             "family": config.font,
             "size": config.font_size,
         },
+        # top margin reserves room for the two-line stats text; scale with
+        # the configured font size so user-supplied larger fonts still fit
+        margin={"t": round(config.font_size * 4)},
         # add global stats as annotation
         annotations=[
-            {"text": title, "y": 1.14, "yref": "paper",
+            {"text": title, "y": 1, "yref": "paper", "yanchor": "bottom",
                  "align": "center", "showarrow": False}
         ]
     )

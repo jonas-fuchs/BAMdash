@@ -404,9 +404,16 @@ class TestBuildFigureLayout:
         _data, layout = _fig_and_payload(two_ref_bam, tmp_out, [], ref="refA")
         anns = layout.get("annotations", [])
         assert len(anns) >= 1
-        # the stats annotation is at y=1.14, yref=paper, no arrow
-        stats_ann = next(a for a in anns if a.get("y") == 1.14 and a.get("yref") == "paper")
+        # the stats annotation is bottom-anchored to the top of the plotting
+        # area so it can never be clipped by the SVG viewport, regardless of
+        # figure height (a fractional y like 1.14 scaled with the panel height
+        # and vanished on tall panels in Firefox/Edge)
+        stats_ann = next(a for a in anns if a.get("yref") == "paper")
+        assert stats_ann["y"] == 1
+        assert stats_ann["yanchor"] == "bottom"
         assert stats_ann["showarrow"] is False
+        # the top margin reserves room for the two-line stats text
+        assert layout["margin"]["t"] >= 2 * 1.2 * config.font_size
 
     def test_no_slider_sets_genome_position_title(self, two_ref_bam, tmp_out):
         _data, layout = _fig_and_payload(two_ref_bam, tmp_out, [], ref="refA")
