@@ -77,14 +77,28 @@ def build_figure(ref, coverage_df, track_data, number_of_tracks, track_heights,
             elif track[1] == "bed":
                 create_track_plot(fig, row, track[0], config.box_bed_size, config.box_bed_alpha)
 
-    # compute upper thresholds for y axis
-    upper = max(coverage_df["coverage"] + max(coverage_df["coverage"] / 10))
+    # compute upper thresholds for y axis. Guard against empty or all-zero
+    # coverage (e.g. a bam with a reference sequence but no mapped reads):
+    # max(coverage) == 0 would make log10(upper) a domain error and produce a
+    # degenerate [0, 0] axis range, so fall back to a flat [0, 1] axis.
+    max_cov = max(coverage_df["coverage"]) if not coverage_df.empty else 0
+    upper = max_cov + max_cov / 10
+    if upper <= 0:
+        upper = 1
     log_upper = max(1, math.ceil(math.log10(upper)))
 
     # global formatting. No per-figure linear/log updatemenu buttons are
     # added: the master HTML page provides a single global log/linear
     # toggle (next to the reference dropdown) that relayouts every
     # subfigure at once, so per-figure buttons would be redundant.
+    #
+    # The stats annotation is anchored with its BOTTOM edge at the top of the
+    # plotting area (y=1, yref="paper", yanchor="bottom") so the text grows
+    # upward into the reserved top margin. A fractional offset like y=1.14
+    # scales with the figure height: on tall panels (large window, many
+    # tracks) the text moved above the SVG viewport and was clipped away
+    # entirely -- reported as a disappearing stats header in Firefox/Edge on
+    # Windows. Window-size dependent, not browser specific.
     fig.update_layout(
         template="plotly_white_custom",
         hovermode="closest",
@@ -92,9 +106,12 @@ def build_figure(ref, coverage_df, track_data, number_of_tracks, track_heights,
             "family": config.font,
             "size": config.font_size,
         },
+        # top margin reserves room for the two-line stats text; scale with
+        # the configured font size so user-supplied larger fonts still fit
+        margin={"t": round(config.font_size * 4)},
         # add global stats as annotation
         annotations=[
-            {"text": title, "y": 1.14, "yref": "paper",
+            {"text": title, "y": 1, "yref": "paper", "yanchor": "bottom",
                  "align": "center", "showarrow": False}
         ]
     )

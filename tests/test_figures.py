@@ -15,7 +15,10 @@ unit-tested directly.
 """
 from __future__ import annotations
 
+import argparse
+import json
 import math
+import re
 import statistics
 from pathlib import Path
 
@@ -26,6 +29,7 @@ from plotly.subplots import make_subplots
 
 from bamdash.scripts import config, plotting
 from tests.conftest import (
+    coverage_df,
     make_bam,
     make_bed,
     make_gb,
@@ -228,6 +232,43 @@ class TestAxisRanges:
 
 
 # --------------------------------------------------------------------------- #
+# Empty / zero-coverage bams
+# --------------------------------------------------------------------------- #
+class TestEmptyCoverage:
+    """A bam with a reference sequence but no mapped reads yields all-zero
+    coverage. The y-axis thresholds must fall back to a valid range instead of
+    raising ``ValueError: math domain error`` from ``log10(0)``."""
+
+    def test_build_figure_all_zero_coverage_returns_valid_thresholds(self):
+        cov = coverage_df(list(range(1, 51)), [0] * 50)
+        args = argparse.Namespace(binsize=1, slider=False)
+        fig, upper, log_upper = plotting.build_figure(
+            "refA", cov, [], 1, [1], "title", args)
+        # upper falls back to a non-degenerate axis range [0, 1]
+        assert upper == 1
+        assert log_upper == 1
+
+    def test_cli_empty_bam_writes_html_with_valid_axis_ranges(self, tmp_path, tmp_out):
+        bam = tmp_path / "empty.bam"
+        make_bam(bam, refs=[("refA", 50)], reads=[])
+        out = run_cli(bam, tmp_out, [])
+        html_text = Path(f"{out}.html").read_text()
+        m = re.search(r"var bamdashAxisRanges = (\{.*?\});", html_text, re.DOTALL)
+        assert m, "bamdashAxisRanges not found"
+        ranges = json.loads(m.group(1))
+        assert ranges["refA"]["linear"] == [0, 1]
+        assert ranges["refA"]["log"] == [0, 1]
+
+    def test_cli_empty_bam_coverage_trace_is_flat_zero(self, tmp_path, tmp_out):
+        bam = tmp_path / "empty.bam"
+        make_bam(bam, refs=[("refA", 50)], reads=[])
+        data, _ = _fig_and_payload(bam, tmp_out, [], ref="refA")
+        cov_traces = [t for t in data if t.get("name") == "coverage"]
+        assert len(cov_traces) == 1
+        assert all(y == 0 for y in cov_traces[0]["y"])
+
+
+# --------------------------------------------------------------------------- #
 # VCF marker / stem correctness
 # --------------------------------------------------------------------------- #
 class TestVcfPlot:
@@ -363,9 +404,16 @@ class TestBuildFigureLayout:
         _data, layout = _fig_and_payload(two_ref_bam, tmp_out, [], ref="refA")
         anns = layout.get("annotations", [])
         assert len(anns) >= 1
-        # the stats annotation is at y=1.14, yref=paper, no arrow
-        stats_ann = next(a for a in anns if a.get("y") == 1.14 and a.get("yref") == "paper")
+        # the stats annotation is bottom-anchored to the top of the plotting
+        # area so it can never be clipped by the SVG viewport, regardless of
+        # figure height (a fractional y like 1.14 scaled with the panel height
+        # and vanished on tall panels in Firefox/Edge)
+        stats_ann = next(a for a in anns if a.get("yref") == "paper")
+        assert stats_ann["y"] == 1
+        assert stats_ann["yanchor"] == "bottom"
         assert stats_ann["showarrow"] is False
+        # the top margin reserves room for the two-line stats text
+        assert layout["margin"]["t"] >= 2 * 1.2 * config.font_size
 
     def test_no_slider_sets_genome_position_title(self, two_ref_bam, tmp_out):
         _data, layout = _fig_and_payload(two_ref_bam, tmp_out, [], ref="refA")
